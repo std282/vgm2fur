@@ -66,8 +66,10 @@ class SN76489:
         return clone
 
     def __str__(self):
-        return '{:1x} {:03x} {:1x} {:03x} {:1x} {:03x} {:1x} {:1x}'.format(
-            self.tonal[0].vol, self.tonal[0].freq,
-            self.tonal[1].vol, self.tonal[1].freq,
-            self.tonal[2].vol, self.tonal[2].freq,
-            self.noise.vol, self.noise.mode)
+        elements = [
+            f'PSG1: {self.tonal[0].freq:03X} {self.tonal[0].vol:X}',
+            f'PSG2: {self.tonal[1].freq:03X} {self.tonal[1].vol:X}',
+            f'PSG3: {self.tonal[2].freq:03X} {self.tonal[2].vol:X}',
+            f'NOISE: {self.noise.mode:X} {self.noise.vol:X}',
+        ]
+        return '  '.join(elements)

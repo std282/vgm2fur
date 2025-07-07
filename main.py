@@ -79,8 +79,12 @@ def decimate_table(table, period):
 # example for testing
 
 song = vgm.Song('songs/cc_zlfa.vgz')
+print('Constructing state table...')
 table = tabulate_genesis(song.events('ym2612', 'sn76489'))
+print('Decimating state table...')
 table = decimate_table(table, 735)
+print('Writing results...')
 with open('table.txt', 'w') as f:
     for entry in table:
         print(f'{entry[0]: 8d} | {entry[1]} | {entry[2]}', file=f)
+print('Done.')

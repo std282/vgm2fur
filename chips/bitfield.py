@@ -43,6 +43,11 @@ class Bitfield:
         return T(self.value)
     def __repr__(self):
         return f'(bitfield){f.value}'
+    
+    @property
+    def all(self):
+        return self.value
+    
 
 class named:
     def __init__(self, a, b):
