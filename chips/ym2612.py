@@ -5,9 +5,8 @@ class YM2612:
     def __init__(self):
         self.lfo = 0
         self.lfo_en = 0
-        self.dac_en = 0
         self.channels = [Channel(), Channel(), Channel3(), 
-            Channel(), Channel(), Channel()]
+                         Channel(), Channel(), Channel6()]
         self.regs = bytearray(0xC0 * 2)
 
     def ch(self, num):
@@ -31,9 +30,6 @@ class YM2612:
         op = YM2612._ch3_op_map[addr[1:0]]
         return self.channels[2].operators[op]
 
-    def _tuple(self):
-        return (self.lfo, self.lfo_en, self.dac_en)
-
     def __eq__(self, other):
         # return (self._tuple() == other._tuple() and
         #     all(a == b for (a, b) in zip(self.channels, other.channels)))
@@ -53,7 +49,7 @@ class YM2612:
                 self.channels[i].opmask = data[7:4]
                 self.channels[i].keyid += 1
             case (0, 0x2B):
-                self.dac_en = data[7]
+                self.ch(6).dac_en = data[7]
             case (p, a) if (a & 0xF0) == 0x30:
                 op = self._get_op(p, a)
                 op.mult = data[3:0]
@@ -236,6 +232,36 @@ class Channel3(Channel):
                 f'OP3 {{ {self.operators[2]} }}',
                 f'OP4 {{ {self.operators[3]} }}',
             ]
+        return ' '.join(elements)
+
+class Channel6(Channel):
+    def __init__(self):
+        self._make_most_fields()
+        self.operators = [Operator(), Operator(), Operator(), Operator()]
+        self.dac_en = 0
+
+    _fields = Channel._fields + ['dac_en']
+
+    def __str__(self):
+        elements = [
+            f'DAC:{'ENA' if self.dac_en else 'DIS'}',
+            f'{self.keyid: 8d}',
+            ''.join(map(lambda x: _OPMASK_MAP[x], f'{self.opmask:04b}')),
+            f'{self.freq:03X}/{self.block} ',
+            f'{self.operators[0].tl:02X}',
+            f'{self.operators[1].tl:02X}',
+            f'{self.operators[2].tl:02X}',
+            f'{self.operators[3].tl:02X} ',
+            f'{self.alg}',
+            f'{Channel._pan_map[self.pan]}',
+            f'{self.fb}',
+            f'{self.pms}',
+            f'{self.ams}',
+            f'OP1 {{ {self.operators[0]} }}',
+            f'OP2 {{ {self.operators[1]} }}',
+            f'OP3 {{ {self.operators[2]} }}',
+            f'OP4 {{ {self.operators[3]} }}',
+        ]
         return ' '.join(elements)
 
 class Operator:
