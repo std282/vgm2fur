@@ -1,20 +1,15 @@
 from . import bitfield
 import copy
-from typing import NamedTuple
 
 class TonalChannel:
     def __init__(self):
         self.freq = 0
         self.vol = 15
-    def as_tuple(self):
-        return TonalChannel_NT(freq=self.freq, vol=self.vol)
 
 class NoiseChannel:
     def __init__(self):
         self.mode = 0
         self.vol = 15
-    def as_tuple(self):
-        return NoiseChannel_NT(mode=self.mode, vol=self.vol)
 
 class EventBF(bitfield.Bitfield):
     is_action = bitfield.named[7]
@@ -24,16 +19,27 @@ class EventBF(bitfield.Bitfield):
     payload_h = bitfield.named[5:0]
 
 class SN76489:
-    def __init__(self):
-        self.tonal = [TonalChannel() for _ in range(3)]
-        self.noise = NoiseChannel()
-        self.lastch = 0
+    def __init__(self, /, noinit=False):
+        if noinit:
+            self.tonal = None
+            self.noise = None
+            self.lastch = None
+        else:
+            self.tonal = [TonalChannel() for _ in range(3)]
+            self.noise = NoiseChannel()
+            self.lastch = 0
 
-    def as_tuple(self):
-        return SN76489_NT(
-            tonal=tuple(t.as_tuple() for t in self.tonal),
-            noise=self.noise.as_tuple(),
-            lastch=self.lastch)
+    def _fields_tuple(self):
+        return (self.tonal[0].freq, self.tonal[0].vol,
+                self.tonal[1].freq, self.tonal[1].vol,
+                self.tonal[2].freq, self.tonal[2].vol,
+                self.noise.mode, self.noise.vol, self.lastch)
+
+    def __eq__(self, other):
+        return self._fields_tuple() == other._fields_tuple()
+
+    def __hash__(self):
+        return hash(self._fields_tuple())
 
     def _channel(self, chan_no):
         match chan_no:
@@ -54,19 +60,11 @@ class SN76489:
         else:
             self.tonal[self.lastch].freq |= data.payload_h << 4
 
+    def updated(self, data):
+        clone = copy.deepcopy(self)
+        clone.update(data)
+        return clone
 
-class TonalChannel_NT(NamedTuple):
-    freq: int
-    vol: int
-
-class NoiseChannel_NT(NamedTuple):
-    mode: int
-    vol: int
-
-class SN76489_NT(NamedTuple):
-    tonal: tuple[TonalChannel_NT, TonalChannel_NT, TonalChannel_NT]
-    noise: NoiseChannel_NT
-    lastch: int
     def __str__(self):
         elements = [
             f'PSG1: {self.tonal[0].freq:03X} {self.tonal[0].vol:X}',

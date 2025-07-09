@@ -13,11 +13,10 @@ def _tabulate(events):
             case FmWrite(port, addr, data):
                 fm = fm.updated(port, addr, data)
             case PsgWrite(data):
-                psg.update(data)
+                psg = psg.updated(data)
             case Wait(delta_t):
-                psg_t = psg.as_tuple()
-                if len(table) == 0 or table[-1].fm != fm or table[-1].psg != psg_t:
-                    table.append(TableState(t, fm, psg_t))
+                if len(table) == 0 or table[-1].fm != fm or table[-1].psg != psg:
+                    table.append(TableState(t, fm, psg))
                 t += delta_t
     return table
 
