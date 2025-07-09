@@ -2,6 +2,7 @@ import vgm
 import chips
 from collections import namedtuple
 import bisect
+import furnace
 
 class FmWrite:
     __match_args__ = ('port', 'addr', 'data')
@@ -77,25 +78,23 @@ def decimate_table(table, period):
         t += period
     return dectable
 
-PSG_NOTE_MAP = [
-    ('A-0', 0x3F9), ('A#0', 0x3C0), ('B-0', 0x38A),
-    ('C-1', 0x357), ('C#1', 0x327), ('D-1', 0x2FA), ('D#1', 0x2CF), ('E-1', 0x2A7), ('F-1', 0x281), 
-    ('F#1', 0x25D), ('G-1', 0x23B), ('G#1', 0x21B), ('A-1', 0x1FC), ('A#1', 0x1E0), ('B-1', 0x1C5), 
-    ('C-2', 0x1AC), ('C#2', 0x194), ('D-2', 0x17D), ('D#2', 0x168), ('E-2', 0x153), ('F-2', 0x140), 
-    ('F#2', 0x12E), ('G-2', 0x11D), ('G#2', 0x10D), ('A-2', 0x0FE), ('A#2', 0x0F0), ('B-2', 0x0E2),
-    ('C-3', 0x0D6), ('C#3', 0x0CA), ('D-3', 0x0BE), ('D#3', 0x0B4), ('E-3', 0x0AA), ('F-3', 0x0A0),
-    ('F#3', 0x097), ('G-3', 0x08F), ('G#3', 0x087), ('A-3', 0x07F), ('A#3', 0x078), ('B-3', 0x071),
-    ('C-4', 0x06B), ('C#4', 0x065), ('D-4', 0x05F), ('D#4', 0x05A), ('E-4', 0x055), ('F-4', 0x050),
-    ('F#4', 0x04C), ('G-4', 0x047), ('G#4', 0x043), ('A-4', 0x040), ('A#4', 0x03C), ('B-4', 0x039),
-    ('C-5', 0x035), ('C#5', 0x032), ('D-5', 0x030), ('D#5', 0x02D), ('E-5', 0x02A), ('F-5', 0x028),
-    ('F#5', 0x026), ('G-5', 0x024), ('G#5', 0x022), ('A-5', 0x020), ('A#5', 0x01E), ('B-5', 0x01C),
-    ('C-6', 0x01B), ('C#6', 0x019), ('D-6', 0x018), ('D#6', 0x016), ('E-6', 0x015), ('F-6', 0x014),
-    ('F#6', 0x013), ('G-6', 0x012), ('G#6', 0x011), ('A-6', 0x010), ('A#6', 0x00F), ('B-6', 0x00E),
-    ('C-7', 0x00D), ('C#7', 0x00C), ('D-7', 0x00B), ('D#7', 0x00A), ('E-7', 0x009), ('F-7', 0x008),
-    ('F#7', 0x007), ('G-7', 0x006), ('G#7', 0x005), ('A-7', 0x004), ('A#7', 0x003), ('B-7', 0x002),
-    ('C-8', 0x001), ('C#8', 0x000),
-]
-PSG_NOTE_MAP = PSG_NOTE_MAP[::-1]
+def _make_psg_note_map():
+    freqs = [
+        0x3F9, 0x3C0, 0x38A, 0x357, 0x327, 0x2FA, 0x2CF, 0x2A7, 0x281, 0x25D, 
+        0x23B, 0x21B, 0x1FC, 0x1E0, 0x1C5, 0x1AC, 0x194, 0x17D, 0x168, 0x153, 
+        0x140, 0x12E, 0x11D, 0x10D, 0x0FE, 0x0F0, 0x0E2, 0x0D6, 0x0CA, 0x0BE, 
+        0x0B4, 0x0AA, 0x0A0, 0x097, 0x08F, 0x087, 0x07F, 0x078, 0x071, 0x06B, 
+        0x065, 0x05F, 0x05A, 0x055, 0x050, 0x04C, 0x047, 0x043, 0x040, 0x03C, 
+        0x039, 0x035, 0x032, 0x030, 0x02D, 0x02A, 0x028, 0x026, 0x024, 0x022, 
+        0x020, 0x01E, 0x01C, 0x01B, 0x019, 0x018, 0x016, 0x015, 0x014, 0x013, 
+        0x012, 0x011, 0x010, 0x00F, 0x00E, 0x00D, 0x00C, 0x00B, 0x00A, 0x009, 
+        0x008, 0x007, 0x006, 0x005, 0x004, 0x003, 0x002, 0x001, 0x000
+    ]
+
+    notemap = [(furnace.notes.A0 + i, freq) for (i, freq) in enumerate(freqs)]
+    return notemap[::-1]
+
+PSG_NOTE_MAP = _make_psg_note_map()
 
 def find_psg_best_note(freq):
     i = bisect.bisect(PSG_NOTE_MAP, freq, key=lambda x: x[1])
@@ -121,7 +120,7 @@ def find_psg_best_note(freq):
         candidates = [(note_l, diff_l), (note_c, diff_c), (note_r, diff_r)]
     return min(candidates, key=lambda x: abs(x[1]))
 
-def transform(entry):
+def find_notes(entry):
     t = entry.t
     n1, d1 = find_psg_best_note(entry.psg.tonal[0].freq)
     v1 = entry.psg.tonal[0].vol
@@ -131,21 +130,47 @@ def transform(entry):
     v3 = entry.psg.tonal[2].vol
     mn = entry.psg.noise.mode
     vn = entry.psg.noise.vol
-    return (t, n1, d1, v1, n2, d2, v2, n3, v3, d3, mn, vn)
+    return (t, (n1, d1, v1), (n2, d2, v2), (n3, v3, d3), (mn, vn))
 
-def entry_to_str(entry):
-    (t, n1, d1, v1, n2, d2, v2, n3, v3, d3, mn, vn) = entry
-    elements = [f'{t: 8d} | ']
-    for (n, d, v) in [(n1, d1, v1), (n2, d2, v2), (n3, d3, v3)]:
-        if v == 15:
-            elements += ['... ... . | ']
+def to_sequencer_commands(entries, channel):
+    assert (0 <= channel and channel < 3)
+    curnote = furnace.notes.Off
+    curvol = 15
+    curins = -1
+    resetporta = 0
+    for entry in entries:
+        note, disp, vol = entry[1 + channel]
+        porta = None
+        if resetporta > 0:
+            porta = furnace.effects.porta_up(0)
+        elif resetporta < 0:
+            porta = furnace.effects.porta_down(0)
+        resetporta = 0
+        if vol == 15:
+            note = furnace.notes.Off
+            vol = None
+        elif vol != curvol:
+            curvol = vol
         else:
-            elements += [f'{n} {d:+03d} {v:X} | ']
-    if vn == 15:
-        elements += ['. .']
-    else:
-        elements += [f'{mn:X} {vn:X}']
-    return ''.join(elements)
+            vol = None
+        ins = None
+        if note != curnote:
+            curnote = note
+            ins = 0
+            if disp > 0:
+                porta = furnace.effects.porta_up(disp)
+                resetporta = 1
+            elif disp < 0:
+                porta = furnace.effects.porta_down(-disp)
+                resetporta = -1
+        else:
+            note = None
+        if porta is not None:
+            fx = [porta]
+        else:
+            fx = None
+        vol = 15 - vol if vol is not None else None
+        yield furnace.Entry(note, ins, vol, fx)
 
 # example for testing
 
@@ -154,9 +179,16 @@ print('Constructing state table...')
 table = tabulate_genesis(song.events('sn76489'))
 print('Decimating state table...')
 table = decimate_table(table, 735)
-table = map(transform, table)
+table = map(find_notes, table)
+print('Generating Furnace module...')
+fur = furnace.Module()
+table = list(table)
+fur.add_instrument(furnace.PSG_BLANK)
+fur.add_patterns(to_sequencer_commands(table, 0), 'psg1')
+fur.add_patterns(to_sequencer_commands(table, 1), 'psg2')
+fur.add_patterns(to_sequencer_commands(table, 2), 'psg3')
+result = fur.build()
 print('Writing results...')
-with open('table.txt', 'w') as f:
-    for entry in table:
-        print(entry_to_str(entry), file=f)
+with open('table.fur', 'wb') as f:
+    f.write(result)
 print('Done.')
