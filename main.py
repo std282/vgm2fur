@@ -10,7 +10,7 @@ psg_chip = transform.tabulate(song.events, song.total_wait, period=735, chips=['
 print('Translating state table to tracker events...')
 psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
 fur = furnace.Module()
-fur.add_instrument(furnace.PSG_BLANK)
+fur.add_instrument(furnace.instr.psg_blank())
 fur.add_patterns(psg1, 'psg1')
 fur.add_patterns(psg2, 'psg2')
 fur.add_patterns(psg3, 'psg3')

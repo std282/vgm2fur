@@ -1,7 +1,7 @@
 from . import builder
 from .module import TARGET_FURNACE_VERSION
 
-def _make_psg_blank_ins():
+def psg_blank():
     ins = [
         b'INS2',
         builder.pack('L', 0),
@@ -23,5 +23,3 @@ def _ins_feature_name(name):
     length = builder.bl_length(feature[2:])
     feature[1] = builder.short(length)
     return b''.join(feature)
-
-PSG_BLANK = _make_psg_blank_ins()
