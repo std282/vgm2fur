@@ -30,11 +30,11 @@ class Song:
             raise BadVgmFile(self.unp.data[0:4])
 
     def events(self, *chiplist):
-        comset = {0x61, 0x62, 0x63, *range(0x70, 0x80)}
+        comset = {0x61, 0x62, 0x63, *range(0x70, 0x90)}
         for chip in chiplist:
             match chip:
                 case 'ym2612':
-                    comset |= {0x52, 0x53, *range(0x80, 0x90)}
+                    comset |= {0x52, 0x53}
                 case 'sn76489':
                     comset |= {0x50}
         _seek_vgm_data_start(self.unp)
