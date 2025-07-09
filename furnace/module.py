@@ -250,7 +250,7 @@ class Module:
             builder.string(''),    # song author
             builder.float(440.0),  # A-4 tuning
             builder.byte(0),       # compat flags
-            builder.byte(2),       # compat flags: linear pitch (very important!)
+            builder.byte(0),       # compat flags: non-linear pitch (very important!)
             builder.byte(0) * 18,  # compat flags
         ]
 

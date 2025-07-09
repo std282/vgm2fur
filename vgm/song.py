@@ -16,20 +16,13 @@ class UnknownCommand(Exception):
         return f'unknown VGM command: {self.com:#04x}'
 
 class Song:
-    def __init__(self, filename):
-        try:
-            with gzip.open(filename) as f:
-                data = f.read()
-        except gzip.BadGzipFile:
-            with open(filename, 'rb') as f:
-                data = f.read()
-        self.unp = unpacker.Unpacker(data)
-        try:
-            self.unp.expect('4s', b'Vgm ')
-        except unpacker.UnexpectedError as err:
+    def __init__(self, data):
+        if data[:4] != b'Vgm ':
             raise BadVgmFile(self.unp.data[0:4])
+        self.data = data
 
     def events(self, *chiplist):
+        unp = unpacker.Unpacker(self.data)
         comset = {0x61, 0x62, 0x63, *range(0x70, 0x90)}
         for chip in chiplist:
             match chip:
@@ -37,10 +30,23 @@ class Song:
                     comset |= {0x52, 0x53}
                 case 'sn76489':
                     comset |= {0x50}
-        _seek_vgm_data_start(self.unp)
-        for com in _events(self.unp):
+        _seek_vgm_data_start(unp)
+        for com in _events(unp):
             if com[0] in comset:
                 yield com
+
+    @property
+    def total_wait(self):
+        return int.from_bytes(self.data[0x18:0x1C])
+
+def load(filename):
+    try:
+        with gzip.open(filename) as f:
+            data = f.read()
+    except gzip.BadGzipFile:
+        with open(filename, 'rb') as f:
+            data = f.read()
+    return Song(data)
 
 def _seek_vgm_data_start(unp):
     unp.offset = 0x34

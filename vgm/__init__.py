@@ -1,1 +1,1 @@
-from .song import Song, BadVgmFile, UnknownCommand
+from .song import load, Song, BadVgmFile, UnknownCommand

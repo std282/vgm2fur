@@ -37,6 +37,10 @@ class Unpacker:
         return result
     def skip(self, length):
         self.offset += length
+    def clone(self):
+        clone = Unpacker(self.data)
+        clone.offset = self.offset
+        return clone
 
 class NoDataError(Exception):
     def __init__(self, offset, requested, available):
