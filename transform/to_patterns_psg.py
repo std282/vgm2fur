@@ -80,21 +80,13 @@ def _channel_data(notetable, channel):
     elif channel == 3:
         return [(n, d, v, m) for (_, _, (n, d, _), (m, v)) in notetable]
 
-def _fx_reset(disp_c):
-    if disp_c > 0:
-        return [furnace.effects.porta_up(0)]
-    elif disp_c < 0:
-        return [furnace.effects.porta_down(0)]
+def _fx_pitch(delta):
+    if delta > 0:
+        return [furnace.effects.pitch_up(delta)]
+    elif delta < 0:
+        return [furnace.effects.pitch_down(-delta)]
     else:
         return None
-
-def _fx_setdisp(disp, disp_c):
-    if disp > 0:
-        return [furnace.effects.porta_up(disp)]
-    elif disp < 0:
-        return [furnace.effects.porta_down(-disp)]
-    else:
-        return _fx_reset(disp_c)
 
 def _transform(psglist, type):
     note_c = furnace.notes.Off
@@ -123,19 +115,20 @@ def _transform(psglist, type):
                 disp = 0
             disp = -disp
 
-        if note != note_c or disp != disp_c:
-            if note == furnace.notes.Off:
-                yield furnace.Entry(note=note, fx=_fx_reset(disp_c))
-                disp_c = 0
-            else:
-                yield furnace.Entry(note=note, vol=vol, ins=0, fx=_fx_setdisp(disp, disp_c))
-                disp_c = disp
-            note_c = note
-            vol_c = vol
-        elif vol != vol_c:
-            yield furnace.Entry(vol=vol, fx=_fx_reset(disp_c))
-            vol_c = vol
-            disp_c = 0
-        else:
-            yield furnace.Entry(fx=_fx_reset(disp_c))
-            disp_c = 0
+        mask = 0
+        mask += 1 if note != note_c else 0
+        mask += 2 if disp != disp_c else 0
+        mask += 4 if vol != vol_c else 0
+        match mask:
+            case 0: yield furnace.Entry()
+            case 2: yield furnace.Entry(fx=_fx_pitch(disp - disp_c))
+            case 4: yield furnace.Entry(vol=vol)
+            case 6: yield furnace.Entry(vol=vol, fx=_fx_pitch(disp - disp_c))
+            case _:
+                if note == furnace.notes.Off:
+                    yield furnace.Entry(note=note)
+                else:
+                    yield furnace.Entry(note=note, ins=0, vol=vol, fx=_fx_pitch(disp))
+        note_c = note
+        disp_c = disp
+        vol_c = vol
