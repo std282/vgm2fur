@@ -1,4 +1,4 @@
-from . import bitfield
+import bitfield
 import copy
 
 class YM2612:
