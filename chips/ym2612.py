@@ -119,7 +119,6 @@ class YM2612:
     def __str__(self):
         elements = [
             f'LFO:{'ENA' if self.lfo_en else 'DIS'}/{self.lfo}',
-            f'DAC:{'ENA' if self.dac_en else 'DIS'}',
             f'FM1 [ {self.channels[0]} ]',
             f'FM2 [ {self.channels[1]} ]',
             f'FM3 [ {self.channels[2]} ]',
