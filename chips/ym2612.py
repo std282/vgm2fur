@@ -5,7 +5,7 @@ class YM2612:
     def __init__(self):
         self.lfo = 0
         self.lfo_en = 0
-        self.channels = [Channel(), Channel(), Channel3(), 
+        self.channels = [Channel(), Channel(), Channel3(),
                          Channel(), Channel(), Channel6()]
         self.regs = bytearray(0xC0 * 2)
 
@@ -112,7 +112,7 @@ class YM2612:
                 pass
 
     def updated(self, port, addr, data):
-        clone = copy.deepcopy(self)
+        clone = self.clone()
         clone.update(port, addr, data)
         return clone
 
@@ -128,6 +128,11 @@ class YM2612:
         ]
         return ' '.join(elements)
 
+    def clone(self):
+        clone = copy.copy(self)
+        clone.channels = [ch.clone() for ch in self.channels]
+        clone.regs = clone.regs.copy()
+        return clone
 
 class Channel:
     def __init__(self):
@@ -177,6 +182,11 @@ class Channel:
             f'OP4 {{ {self.operators[3]} }}',
         ]
         return ' '.join(elements)
+
+    def clone(self):
+        clone = copy.copy(self)
+        clone.operators = [op.clone() for op in clone.operators]
+        return clone
 
 
 class Channel3(Channel):
@@ -233,6 +243,16 @@ class Channel3(Channel):
             ]
         return ' '.join(elements)
 
+    def clone(self):
+        clone = copy.copy(self)
+        clone.operators = [
+            clone.operators[0].clone(),
+            clone.operators[1].clone(),
+            clone.operators[2].clone(),
+            clone.operators[3].clone(clone),
+        ]
+        return clone
+
 class Channel6(Channel):
     def __init__(self):
         self._make_most_fields()
@@ -266,7 +286,7 @@ class Channel6(Channel):
 class Operator:
     def __init__(self):
         self._make_most_fields()
-        
+
     def _make_most_fields(self):
         self.mult = 0
         self.dt = 0
@@ -303,6 +323,9 @@ class Operator:
         ]
         return ' '.join(elements)
 
+    def clone(self):
+        return copy.copy(self)
+
 
 class Operator3(Operator):
     def __init__(self):
@@ -311,6 +334,9 @@ class Operator3(Operator):
         self.block = 0
 
     _fields = Operator._fields + 'freq block'.split()
+
+    def clone(self):
+        return copy.copy(self)
 
 
 class Operator3_4(Operator):
@@ -322,6 +348,11 @@ class Operator3_4(Operator):
     def freq(self): return self._owner.freq
     @property
     def block(self): return self._owner.block
+
+    def clone(self, owner):
+        clone = copy.copy(self)
+        clone._owner = owner
+        return clone
 
 
 _OPMASK_MAP = {'0': '.', '1': '#'}
