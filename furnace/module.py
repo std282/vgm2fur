@@ -33,7 +33,7 @@ def _make_entry_data(note, ins, vol, fx):
                 payload += fxtype.to_bytes(1) + fxval.to_bytes(1)
                 mask |= m
                 m <<= 2
-    return mask.to_bytes(masklen) + payload
+    return mask.to_bytes(masklen, 'little') + payload
 
 class Entry:
     def __init__(self, note=None, ins=None, vol=None, fx=None):
@@ -161,6 +161,12 @@ class Module:
         self.order_count = 0
         self.pattern_count = 0
         self.instruments = []
+        self.ym2612_volume = 1.0
+        self.sn76489_volume = 1.0
+
+    @property
+    def instrument_count(self):
+        return len(self.instruments)
 
     def add_patterns(self, entries, channel):
         if type(channel) is str:
@@ -278,10 +284,10 @@ class Module:
             builder.string(''),  # song author (JP)
             builder.string('SEGA MegaDrive'),  # system name (JP)
             builder.string(''),  # album/cat./game name (JP)
-            builder.float(1.0),  # chip 1 volume
+            builder.float(self.ym2612_volume),  # chip 1 volume
             builder.float(0.0),  # chip 1 panning
             builder.float(0.0),  # chip 1 front/rear balance
-            builder.float(1.0),  # chip 2 volume
+            builder.float(self.sn76489_volume),  # chip 2 volume
             builder.float(0.0),  # chip 2 panning
             builder.float(0.0),  # chip 2 front/rear balance
             builder.long(0),     # patchbay connection count
