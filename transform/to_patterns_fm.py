@@ -225,7 +225,7 @@ def _normalize_voice(voice):
             tl = (tl[0] - vol, tl[1] - vol)
             voice = voice._replace(op=(
                 voice.op[0], voice.op[1]._replace(tl=tl[0]),
-                voice.op[0], voice.op[3]._replace(tl=tl[1])))
+                voice.op[2], voice.op[3]._replace(tl=tl[1])))
         case 5 | 6:
             tl = (voice.op[1].tl, voice.op[2].tl, voice.op[3].tl)
             vol = min(tl)
