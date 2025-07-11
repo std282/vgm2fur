@@ -1,4 +1,5 @@
 from . import builder
+import zlib
 
 TARGET_FURNACE_VERSION = 228  # Furnace v0.6.8.1
 
@@ -214,7 +215,7 @@ class Module:
                 index += 1
                 self.pattern_count += 1
 
-    def build(self):
+    def build(self, *, comp=True):
         self.prebuild()
         fileptr = 0
         file = bytearray()
@@ -347,7 +348,10 @@ class Module:
         # writing pattern data
         file += b''.join(patterns)
 
-        return bytes(file)
+        if comp:
+            return zlib.compress(bytes(file))
+        else:
+            return bytes(file)
 
 
 def _make_instrument_asset_dir(instcount):
