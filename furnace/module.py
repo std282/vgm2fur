@@ -163,6 +163,7 @@ class Module:
         self.instruments = []
         self.ym2612_volume = 1.0
         self.sn76489_volume = 1.0
+        self.song_comment = ''
 
     @property
     def instrument_count(self):
@@ -269,7 +270,7 @@ class Module:
             builder.byte(0) * self.channel_count,  # channel collapse status
             builder.string('') * self.channel_count,  # channel names
             builder.string('') * self.channel_count,  # channel short names
-            builder.string(''),  # song comment
+            builder.string(self.song_comment),
             builder.float(1.0),  # master volume
             builder.byte(0) * 28,  # ext compat flags
             builder.short(150),  # v.tempo numerator
