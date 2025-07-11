@@ -74,7 +74,7 @@ def _make_fm_underfreq_map(freq_map):
         shift += 0 if i > 0 else 1
         i = (i - 1) if i > 0 else 11
         freq = freq_map[i][1] >> shift
-    return underfreq_map
+    return underfreq_map[::-1]
 
 FmFreq = FmFreqClass()
 
