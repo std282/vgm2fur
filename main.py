@@ -38,8 +38,8 @@ def convert(filename_in, filename_out, /, *, period):
         print(f'error: could not open file "{filename_in}": {err}', file=sys.stderr)
         exit(1)
     print('Constructing state table...')
-    
-    fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait, 
+
+    fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait,
         period=period, chips=['ym2612', 'sn76489'])
 
     print('Translating state table to tracker events...')
@@ -79,8 +79,8 @@ def dump(filename_in, filename_out, /, *, period):
         print(f'error: could not open file "{filename_in}": {err}', file=sys.stderr)
         exit(1)
     print('Constructing state table...')
-    
-    results = transform.tabulate(song.events, song.total_wait, 
+
+    results = transform.tabulate(song.events, song.total_wait,
         period=period, chips=['ym2612', 'sn76489'])
 
     print('Writing output...')
@@ -92,7 +92,6 @@ def dump(filename_in, filename_out, /, *, period):
             for i, (fm, psg) in enumerate(zip(*results)):
                 print(f'{i: 8d} || {fm} || {psg}', file=f)
     print('Done.')
-
 
 
 if __name__ == '__main__':

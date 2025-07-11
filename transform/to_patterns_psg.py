@@ -7,7 +7,7 @@ def to_patterns_psg(chip):
     psg2 = _channel_data(noted, 1)
     psg3 = _channel_data(noted, 2)
     noise = _channel_data(noted, 3)
-    return (_transform(psg1, 0), _transform(psg2, 0), _transform(psg3, 1), 
+    return (_transform(psg1, 0), _transform(psg2, 0), _transform(psg3, 1),
             _transform(noise, 2))
 
 def _make_psg_note_map():
@@ -29,7 +29,7 @@ def _make_psg_note_map():
 #         G6    G#6     A6    A#6     B6     C7    C#7     D7    D#7     E7
         0x012, 0x011, 0x010, 0x00F, 0x00E, 0x00D, 0x00C, 0x00B, 0x00A, 0x009,
 #         F7    F#7     G7    G#7     A7    A#7     B7     C8    C#8
-        0x008, 0x007, 0x006, 0x005, 0x004, 0x003, 0x002, 0x001, 0x000        
+        0x008, 0x007, 0x006, 0x005, 0x004, 0x003, 0x002, 0x001, 0x000
     ]
 
     notemap = [(furnace.notes.A0 + i, freq) for (i, freq) in enumerate(freqs)]

@@ -7,7 +7,7 @@ def _make_entry_data(note, ins, vol, fx):
     mask = 0
     masklen = 1
     payload = b''
-    if note is not None: 
+    if note is not None:
         mask |= 1
         payload += note.to_bytes(1)
     if ins is not None:
@@ -191,10 +191,10 @@ class Module:
         def _update_effects_count(fxcount):
             if fxcount > 0:
                 self.effects_count[channel] = fxcount
-        
+
         new_patterns = list(
-            _patterns(channel, 
-                _chunks(self.pattern_length, 
+            _patterns(channel,
+                _chunks(self.pattern_length,
                     _stream(
                         _pass_entries(
                             entries, _update_effects_count)))))
@@ -308,7 +308,7 @@ class Module:
         info[1] = builder.long(info_size)
         # updating file pointer as if we have already written song info
         fileptr += info_size + 8
-    
+
         # writing instrument asset directory pointer to song info
         info_2[-3] = builder.long(fileptr)
         # creating instrument asset directory data

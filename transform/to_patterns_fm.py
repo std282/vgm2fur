@@ -31,7 +31,7 @@ class FmFreqClass:
         dist_max = (freq_map[-1][1] - freq_map[-2][1]) // 2
         self.freq_map = freq_map[1:-1]
         self.freq_min = self.freq_map[0][1] - dist_min
-        self.freq_max = self.freq_map[-1][1] + dist_max 
+        self.freq_max = self.freq_map[-1][1] + dist_max
         self.overfreq_map = _make_fm_overfreq_map(self.freq_map)
         self.underfreq_map = _make_fm_underfreq_map(self.freq_map)
 
@@ -40,7 +40,7 @@ def _make_fm_freq_map():
     #     B-
         0x260,
     #     C      C#     D      D#     E      F
-        0x284, 0x2AA, 0x2D2, 0x2FD, 0x32B, 0x35B, 
+        0x284, 0x2AA, 0x2D2, 0x2FD, 0x32B, 0x35B,
     #     F#     G      G#     A      A#     B
         0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4C0,
     #     C+
@@ -150,7 +150,7 @@ def _to_key_voice(ch):
         note, disp = _find_best_note(ch.freq, ch.block)
         voice = _extract_voice(ch)
         voice, vol = _normalize_voice(voice)
-        key = Key(note=note, disp=disp, vol=vol, 
+        key = Key(note=note, disp=disp, vol=vol,
             id=ch.keyid, opmask=ch.opmask, pan=ch.pan)
     else:
         voice = None
@@ -205,16 +205,16 @@ def _extract_voice(ch):
     return furnace.instr.FMVoice(
         alg=ch.alg, fb=ch.fb, pms=ch.pms, ams=ch.ams, op=(
             furnace.instr.FMOp(mult=op1.mult, dt=op1.dt, tl=op1.tl, ar=op1.ar,
-                rs=op1.rs, dr=op1.dr, am=op1.am, sr=op1.sr, rr=op1.rr, sl=op1.sl, 
+                rs=op1.rs, dr=op1.dr, am=op1.am, sr=op1.sr, rr=op1.rr, sl=op1.sl,
                 ssg=op1.ssg, ssg_en=op1.ssg_en),
             furnace.instr.FMOp(mult=op2.mult, dt=op2.dt, tl=op2.tl, ar=op2.ar,
-                rs=op2.rs, dr=op2.dr, am=op2.am, sr=op2.sr, rr=op2.rr, sl=op2.sl, 
+                rs=op2.rs, dr=op2.dr, am=op2.am, sr=op2.sr, rr=op2.rr, sl=op2.sl,
                 ssg=op2.ssg, ssg_en=op2.ssg_en),
             furnace.instr.FMOp(mult=op3.mult, dt=op3.dt, tl=op3.tl, ar=op3.ar,
-                rs=op3.rs, dr=op3.dr, am=op3.am, sr=op3.sr, rr=op3.rr, sl=op3.sl, 
+                rs=op3.rs, dr=op3.dr, am=op3.am, sr=op3.sr, rr=op3.rr, sl=op3.sl,
                 ssg=op3.ssg, ssg_en=op3.ssg_en),
             furnace.instr.FMOp(mult=op4.mult, dt=op4.dt, tl=op4.tl, ar=op4.ar,
-                rs=op4.rs, dr=op4.dr, am=op4.am, sr=op4.sr, rr=op4.rr, sl=op4.sl, 
+                rs=op4.rs, dr=op4.dr, am=op4.am, sr=op4.sr, rr=op4.rr, sl=op4.sl,
                 ssg=op4.ssg, ssg_en=op4.ssg_en)))
 
 def _normalize_voice(voice):
@@ -222,7 +222,7 @@ def _normalize_voice(voice):
         case 0 | 1 | 2 | 3:
             vol = voice.op[3].tl
             voice = voice._replace(op=(
-                voice.op[0], voice.op[1], 
+                voice.op[0], voice.op[1],
                 voice.op[2], voice.op[3]._replace(tl=0)))
         case 4:
             tl = (voice.op[1].tl, voice.op[3].tl)
@@ -236,7 +236,7 @@ def _normalize_voice(voice):
             vol = min(tl)
             tl = (tl[0] - vol, tl[1] - vol, tl[2] - vol)
             voice = voice._replace(op=(
-                voice.op[0], 
+                voice.op[0],
                 voice.op[1]._replace(tl=tl[0]),
                 voice.op[2]._replace(tl=tl[1]),
                 voice.op[3]._replace(tl=tl[2])))
@@ -268,7 +268,7 @@ def _collect_voices(chlist, init=0):
             if i == 2 or i == 5:
                 (_, voice, _) = state
             else:
-                (_, voice) = state  
+                (_, voice) = state
             if voice is not None and voice not in voices:
                 voices[voice] = index
                 index += 1

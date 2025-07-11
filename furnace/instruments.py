@@ -104,7 +104,7 @@ def _ins_feature_fm(voice):
         kvs_sr[4:0] = op.sr
         kvs_sr[6:5] = 2  # KVS
         '''KVS shouldn't be here. It's not a parameter of YM2612, but for some
-        obscure reason it has an effect, which presents itself as ignored note
+        obscure reason it has an effect, which makes Furnace ignore note
         volume parameters.'''
         sl_rr = bitfield.Bitfield()
         sl_rr[3:0] = op.rr
