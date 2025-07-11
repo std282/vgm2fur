@@ -24,20 +24,21 @@ if __name__ == '__main__':
     fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait, 
         period=735, chips=['ym2612', 'sn76489'])
     print('Translating state table to tracker events...')
-    psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
-    fm_channels, fm_voices = transform.to_patterns_fm(fm_chip, voice_start=1)
-    fm1, fm2, fm3, fm4, fm5, fm6 = fm_channels
-    print('Generating Furnace patterns...')
     fur = furnace.Module()
+    psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
     fur.add_instrument(furnace.instr.psg_blank('PSG_BLANK'))
-    for i, (voice, _) in enumerate(sorted(fm_voices.items(), key=lambda x: x[1])):
+    fm1, fm2, fm3, fm4, fm5, fm6 = transform.prepare_fm(fm_chip)
+    voices = transform.collect_fm_voices(fm1, fm2, fm3, fm4, fm5, fm6,
+        voice_start=fur.instrument_count)
+    print('Generating Furnace patterns...')
+    for i, (voice, _) in enumerate(sorted(voices.items(), key=lambda x: x[1])):
         fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
-    fur.add_patterns(fm1, 'fm1')
-    fur.add_patterns(fm2, 'fm2')
-    fur.add_patterns(fm3, 'fm3')
-    fur.add_patterns(fm4, 'fm4')
-    fur.add_patterns(fm5, 'fm5')
-    fur.add_patterns(fm6, 'fm6')
+    fur.add_patterns(transform.to_patterns_fm(fm1, voices), 'fm1')
+    fur.add_patterns(transform.to_patterns_fm(fm2, voices), 'fm2')
+    fur.add_patterns(transform.to_patterns_fm3(fm3, voices), 'fm3')
+    fur.add_patterns(transform.to_patterns_fm(fm4, voices), 'fm4')
+    fur.add_patterns(transform.to_patterns_fm(fm5, voices), 'fm5')
+    fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')
     fur.add_patterns(psg1, 'psg1')
     fur.add_patterns(psg2, 'psg2')
     fur.add_patterns(psg3, 'psg3')

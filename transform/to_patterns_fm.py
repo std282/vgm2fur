@@ -2,7 +2,7 @@ from typing import NamedTuple
 import bisect
 import furnace
 
-def to_patterns_fm(chip, voice_start):
+def prepare_fm(chip):
     fm1, fm2, fm3, fm4, fm5, fm6 = _split_fm(chip)
     fm1 = list(map(_to_key_voice, fm1))
     fm2 = list(map(_to_key_voice, fm2))
@@ -10,14 +10,19 @@ def to_patterns_fm(chip, voice_start):
     fm4 = list(map(_to_key_voice, fm4))
     fm5 = list(map(_to_key_voice, fm5))
     fm6 = list(map(_to_key_voice_dac, fm6))
-    voices = _collect_voices([fm1, fm2, fm3, fm4, fm5, fm6], voice_start)
-    fm1 = _transform(fm1, voices, 0)
-    fm2 = _transform(fm2, voices, 0)
-    fm3 = _transform(fm3, voices, 1)
-    fm4 = _transform(fm4, voices, 0)
-    fm5 = _transform(fm5, voices, 0)
-    fm6 = _transform(fm6, voices, 2)
-    return (fm1, fm2, fm3, fm4, fm5, fm6), voices
+    return fm1, fm2, fm3, fm4, fm5, fm6
+
+def collect_fm_voices(*channels, voice_start):
+    return _collect_voices(channels, voice_start)
+
+def to_patterns_fm(channel, voices):
+    return _transform(channel, voices, 0)
+
+def to_patterns_fm3(channel, voices):
+    return _transform(channel, voices, 1)
+
+def to_patterns_fm6(channel, voices):
+    return _transform(channel, voices, 2)
 
 class FmFreqClass:
     def __init__(self):
