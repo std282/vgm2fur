@@ -100,8 +100,12 @@ def _ins_feature_fm(voice):
         am_dr = bitfield.Bitfield()
         am_dr[4:0] = op.dr
         am_dr[7] = op.am
-        sr = bitfield.Bitfield()
-        sr[4:0] = op.sr
+        kvs_sr = bitfield.Bitfield()
+        kvs_sr[4:0] = op.sr
+        kvs_sr[6:5] = 2  # KVS
+        '''KVS shouldn't be here. It's not a parameter of YM2612, but for some
+        obscure reason it has an effect, which presents itself as ignored note
+        volume parameters.'''
         sl_rr = bitfield.Bitfield()
         sl_rr[3:0] = op.rr
         sl_rr[7:4] = op.sl
@@ -113,7 +117,7 @@ def _ins_feature_fm(voice):
             tl.all.to_bytes(1),
             rs_ar.all.to_bytes(1),
             am_dr.all.to_bytes(1),
-            sr.all.to_bytes(1),
+            kvs_sr.all.to_bytes(1),
             sl_rr.all.to_bytes(1),
             ssg.all.to_bytes(1),
             builder.byte(0),
