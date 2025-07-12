@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 from . import builder
 from .module import TARGET_FURNACE_VERSION
-import bitfield
+from vgm2fur import bitfield
 
 class FMOp(NamedTuple):
     mult: int

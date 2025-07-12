@@ -1,4 +1,4 @@
-import chips
+from vgm2fur import chips
 from collections import namedtuple
 
 TableState = namedtuple('TableState', 't, fm, psg')

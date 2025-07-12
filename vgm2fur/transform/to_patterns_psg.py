@@ -1,5 +1,5 @@
 import bisect
-import furnace
+from vgm2fur import furnace
 
 def to_patterns_psg(chip):
     noted = list(map(_find_best_notes, chip))

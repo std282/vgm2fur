@@ -1,6 +1,6 @@
 from typing import NamedTuple
 import bisect
-import furnace
+from vgm2fur import furnace
 
 def prepare_fm(chip):
     fm1, fm2, fm3, fm4, fm5, fm6 = _split_fm(chip)

@@ -1,4 +1,4 @@
-import bitfield
+from vgm2fur import bitfield
 import copy
 
 class TonalChannel:

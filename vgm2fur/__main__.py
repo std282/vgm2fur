@@ -1,6 +1,6 @@
-import vgm
-import furnace
-import transform
+from . import vgm
+from . import furnace
+from . import transform
 
 import sys
 import getopt
