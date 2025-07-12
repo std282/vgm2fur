@@ -6,6 +6,7 @@ import sys
 import getopt
 import enum
 import contextlib
+import types
 
 @contextlib.contextmanager
 def open_or(filename, *args, defaultfile, **kwargs):
@@ -27,9 +28,9 @@ def error(message):
     exit(1)
 
 def print_usage():
-    usage = '''usage: vgm2fur <vgm-file> -o <furnace-file> [--period=PERIOD]'''
+    usage = '''usage:
+  vgm2fur -c input.vgm -o output.fur'''
     print(usage, file=sys.stderr)
-    exit(1)
 
 def convert(filename_in, filename_out, /, *, period):
     try:
@@ -37,8 +38,8 @@ def convert(filename_in, filename_out, /, *, period):
     except Exception as err:
         print(f'error: could not open file "{filename_in}": {err}', file=sys.stderr)
         exit(1)
-    print('Constructing state table...')
 
+    print('Constructing state table...')
     fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait,
         period=period, chips=['ym2612', 'sn76489'])
 
@@ -72,7 +73,7 @@ def convert(filename_in, filename_out, /, *, period):
 
     print('Done.')
 
-def dump(filename_in, filename_out, /, *, period):
+def _print(filename_in, filename_out, /, *, period):
     try:
         song = vgm.load(filename_in)
     except Exception as err:
@@ -96,60 +97,55 @@ def dump(filename_in, filename_out, /, *, period):
 
 if __name__ == '__main__':
     class Action(enum.Enum):
-        Convert = 1
-        Dump = 2
+        UNSPEC = ''
+        CONVERT = 'convert'
+        PRINT = 'print'
 
-    input_file = None
-    output_file = None
-    action = Action.Convert
-    period = 735
-    anything = False
+    params = types.SimpleNamespace()
+    params.infile = None
+    params.outfile = None
+    action = Action.UNSPEC
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:', ['dump', 'period='])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:', ['convert', 'print'])
     except getopt.GetoptError as err:
         error(err)
+
+    def warn_ignored_action():
+        if action != Action.UNSPEC:
+            warning(f'"{action.value}" action ignored')
 
     for key, value in opts:
         match key:
             case '-o':
-                output_file = value
-            case '--dump':
-                action = Action.Dump
-            case 'period':
-                try:
-                    period = int(value)
-                except Exception as err:
-                    error(f'failed to parse period value: {err}')
-                if period <= 0:
-                    error(f'invalid period value ({period}); must be a positive number')
-        anything = True
+                params.outfile = value
+            case '-c' | '--convert':
+                warn_ignored_action()
+                action = Action.CONVERT
+            case '-p' | '--print':
+                warn_ignored_action()
+                action = Action.PRINT
 
     try:
         iargs = iter(args)
-        input_file = next(iargs)
-        anything = True
+        params.infile = next(iargs)
         for arg in iargs:
             warning(f'ignored argument: {arg}')
     except StopIteration:
         pass
     del iargs
 
-    if not anything:
-        print_usage()
-
     match action:
-        case Action.Convert:
-            if input_file is None:
+        case Action.UNSPEC:            
+            print_usage()
+            exit(1)
+        case Action.CONVERT:
+            if params.infile is None:
                 error('input file required')
-            elif output_file is None:
+            elif params.outfile is None:
                 error('output file required')
-            elif period <= 0:
-                error(f'invalid period value ({period}); must be a positive number')
-            convert(input_file, output_file, period=period)
-        case Action.Dump:
-            if input_file is None:
+            convert(input_file, output_file, period=735)
+        case Action.PRINT:
+            if params.infile is None:
                 error('input file required')
-            elif period < 0:
-                error(f'invalid period value ({period}); must be a non-negative number')
-            dump(input_file, output_file, period=period)
+            _print(input_file, output_file, period=735)
