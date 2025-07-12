@@ -144,8 +144,8 @@ if __name__ == '__main__':
                 error('input file required')
             elif params.outfile is None:
                 error('output file required')
-            convert(input_file, output_file, period=735)
+            convert(params.infile, params.outfile, period=735)
         case Action.PRINT:
             if params.infile is None:
                 error('input file required')
-            _print(input_file, output_file, period=735)
+            _print(params.infile, params.outfile, period=735)
