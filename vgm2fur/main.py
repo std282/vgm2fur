@@ -2,6 +2,8 @@ from . import vgm
 from . import furnace
 from . import transform
 
+VERSION = '0.1'
+
 import sys
 import getopt
 import enum
@@ -18,7 +20,6 @@ def open_or(filename, *args, defaultfile, **kwargs):
             yield file
         finally:
             file.close()
-
 
 def warning(message):
     print(f'warning: {message}')
@@ -73,7 +74,7 @@ def convert(filename_in, filename_out, /, *, period):
 
     print('Done.')
 
-def _print(filename_in, filename_out, /, *, period):
+def print_(filename_in, filename_out, /, *, period):
     try:
         song = vgm.load(filename_in)
     except Exception as err:
@@ -148,4 +149,4 @@ if __name__ == '__main__':
         case Action.PRINT:
             if params.infile is None:
                 error('input file required')
-            _print(params.infile, params.outfile, period=735)
+            print_(params.infile, params.outfile, period=735)
