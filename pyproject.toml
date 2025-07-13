@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vgm2fur"
+authors = [
+  {name = "std282"}
+]
+requires-python = ">=3.13"
+license = "MIT"
+dynamic = ["version"]
+
+[project.scripts]
+vgm2fur = 'vgm2fur.main:main'
+
+[tool.setuptools.dynamic]
+version = {attr = "vgm2fur.__version__"}
