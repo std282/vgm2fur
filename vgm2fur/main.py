@@ -2,8 +2,6 @@ from . import vgm
 from . import furnace
 from . import transform
 
-VERSION = '0.1'
-
 import sys
 import getopt
 import enum
@@ -95,8 +93,7 @@ def print_(filename_in, filename_out, /, *, period):
                 print(f'{i: 8d} || {fm} || {psg}', file=f)
     print('Done.')
 
-
-if __name__ == '__main__':
+def main():
     class Action(enum.Enum):
         UNSPEC = ''
         CONVERT = 'convert'
