@@ -1,3 +1,5 @@
+from . import __version__ as vgm2fur_version
+
 from . import vgm
 from . import furnace
 from . import transform
@@ -98,6 +100,7 @@ def main():
         UNSPEC = ''
         CONVERT = 'convert'
         PRINT = 'print'
+        VERSION = 'version'
 
     params = types.SimpleNamespace()
     params.infile = None
@@ -105,7 +108,7 @@ def main():
     action = Action.UNSPEC
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:', ['convert', 'print'])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:', ['convert', 'print', 'version'])
     except getopt.GetoptError as err:
         error(err)
 
@@ -123,6 +126,8 @@ def main():
             case '-p' | '--print':
                 warn_ignored_action()
                 action = Action.PRINT
+            case '--version':
+                action = Action.VERSION
 
     try:
         iargs = iter(args)
@@ -147,3 +152,5 @@ def main():
             if params.infile is None:
                 error('input file required')
             print_(params.infile, params.outfile, period=735)
+        case Action.VERSION:
+            print(f'vgm2fur v{vgm2fur_version}')
