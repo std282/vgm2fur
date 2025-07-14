@@ -236,11 +236,11 @@ class Module:
         info = [
             b'INFO',
             builder.long(0),   # size
-            builder.byte(1),   # time base
+            builder.byte(0),   # time base (why 0?)
             builder.byte(1),   # speed 1
             builder.byte(1),   # speed 2
-            builder.byte(0),   # initial arp time
-            builder.float(float(self.ticks_per_second)),
+            builder.byte(1),   # initial arp time
+            builder.float(self.ticks_per_second),
             builder.short(self.pattern_length),
             builder.short(self.order_count),
             builder.byte(0),   # highlight A
@@ -295,7 +295,9 @@ class Module:
             builder.long(0),     # patchbay connection count
             builder.byte(1),     # automatic patchbay
             builder.byte(0) * 8,  # yet more compat flags
-            builder.byte(0) * 17,  # speed pattern
+            builder.byte(0),     # speed pattern length
+            builder.byte(1),     # speed pattern
+            builder.byte(0) * 15,  # speed pattern
             builder.byte(0),     # groove entry count
             builder.long(0),     # pointer to instruments asset dir
             builder.long(0),     # pointer to wavetables asset dir

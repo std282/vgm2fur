@@ -201,7 +201,7 @@ def convert(filename_in, filename_out, /, *, period):
     fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')
 
     print('Writing Furnace module...')
-    fur.song_comment = 'Generated with vgm2fur'
+    fur.song_comment = f'Generated with vgm2fur v{vgm2fur_version}'
     result = fur.build()
     with open(filename_out, 'wb') as f:
         f.write(result)
