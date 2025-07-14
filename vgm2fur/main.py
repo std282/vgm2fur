@@ -10,13 +10,147 @@ import getopt
 import enum
 import contextlib
 import types
+import gzip
+import zlib
+
+def main():
+    try:
+        _main()
+    except AppError as err:
+        print(f'error: {err}', file=sys.stderr)
+
+def _main():
+    class Action(enum.Enum):
+        UNSPEC = ''
+        CONVERT = 'convert'
+        PRINT = 'print'
+        VERSION = 'version'
+        DECOMPRESS = 'decompress'
+
+    params = types.SimpleNamespace()
+    params.infile = None
+    params.outfile = None
+    action = Action.UNSPEC
+
+    try:
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:z', 
+            ['convert', 'print', 'version', 'decompress'])
+    except getopt.GetoptError as err:
+        raise ArgParseError(err)
+
+    def warn_ignored_action():
+        if action != Action.UNSPEC:
+            warning(f'"{action.value}" action ignored')
+
+    for key, value in opts:
+        match key:
+            case '-o':
+                params.outfile = value
+            case '-c' | '--convert':
+                warn_ignored_action()
+                action = Action.CONVERT
+            case '-p' | '--print':
+                warn_ignored_action()
+                action = Action.PRINT
+            case '--version':
+                warn_ignored_action()
+                action = Action.VERSION
+            case '-z' | '--decompress':
+                warn_ignored_action()
+                action = Action.DECOMPRESS
+
+    try:
+        iargs = iter(args)
+        params.infile = next(iargs)
+        for arg in iargs:
+            warning(f'ignored argument: {arg}')
+    except StopIteration:
+        pass
+    del iargs
+
+    match action:
+        case Action.UNSPEC:            
+            print_usage()
+            exit(1)
+        case Action.CONVERT:
+            if params.infile is None:
+                raise NoInputFile()
+            elif params.outfile is None:
+                raise NoOutputFile()
+            convert(params.infile, params.outfile, period=735)
+        case Action.PRINT:
+            if params.infile is None:
+                raise NoInputFile()
+            print_(params.infile, params.outfile, period=735)
+        case Action.VERSION:
+            print(f'vgm2fur v{vgm2fur_version}')
+        case Action.DECOMPRESS:
+            if params.infile is None:
+                raise NoInputFile()
+            elif params.outfile is None:
+                raise NoOutputFile()    
+            decompress(params.infile, params.outfile)
+
+class FileOpenReadError(AppError):
+    def __init__(self, filename, err):
+        super().__init__(filename, err)
+        self.filename = filename
+        self.err = err
+    def __str__(self):
+        return f'could not open file "{self.filename}" for reading: {self.err}'
+
+class FileOpenWriteError(AppError):
+    def __init__(self, filename, err):
+        super().__init__(filename, err)
+        self.filename = filename
+        self.err = err
+    def __str__(self):
+        return f'could not open file "{self.filename}" for writing: {self.err}'
+
+class ArgParseError(AppError):
+    def __init__(self, err):
+        super().__init__(err)
+        self.err = err
+    def __str__(self):
+        return str(self.err)
+
+class InvalidCompressedFileFormat(AppError):
+    def __init__(self, filename):
+        super().__init__(filename)
+        self.filename = filename
+    def __str__(self):
+        return f'unable to decompress file "{self.filename}": unknown file format'
+
+class NoInputFile(AppError):
+    def __init__(self):
+        super().__init__()
+    def __str__(self):
+        return f'no input file provided'
+
+class NoOutputFile(AppError):
+    def __init__(self):
+        super().__init__()
+    def __str__(self):
+        return f'no output file provided'
+
+def _open_read(filename):
+    try:
+        return open(filename, 'rb')
+    except OSError as err:
+        raise FileOpenReadError(filename, err)
+
+def _open_write(filename):
+    try:
+        return open(filename, 'wb')
+    except OSError as err:
+        raise FileOpenWriteError(filename, err)
 
 @contextlib.contextmanager
-def open_or(filename, *args, defaultfile, **kwargs):
+def _open_write_or(filename, /, *, defaultfile):
     if filename is None:
         yield defaultfile
     else:
-        file = open(filename, *args, **kwargs)
+        file = _open_write(filename)
         try:
             yield file
         finally:
@@ -37,9 +171,8 @@ def print_usage():
 def convert(filename_in, filename_out, /, *, period):
     try:
         song = vgm.load(filename_in)
-    except Exception as err:
-        print(f'error: could not open file "{filename_in}": {err}', file=sys.stderr)
-        exit(1)
+    except OSError as err:
+        raise FileOpenReadError(filename_in) from None
 
     print('Constructing state table...')
     fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait,
@@ -72,17 +205,15 @@ def convert(filename_in, filename_out, /, *, period):
     result = fur.build()
     with open(filename_out, 'wb') as f:
         f.write(result)
-
     print('Done.')
 
 def print_(filename_in, filename_out, /, *, period):
     try:
         song = vgm.load(filename_in)
-    except Exception as err:
-        print(f'error: could not open file "{filename_in}": {err}', file=sys.stderr)
-        exit(1)
-    print('Constructing state table...')
+    except OSError as err:
+        raise FileOpenReadError(filename_in) from None
 
+    print('Constructing state table...')
     results = transform.tabulate(song.events, song.total_wait,
         period=period, chips=['ym2612', 'sn76489'])
 
@@ -96,65 +227,31 @@ def print_(filename_in, filename_out, /, *, period):
                 print(f'{i: 8d} || {fm} || {psg}', file=f)
     print('Done.')
 
-def main():
-    class Action(enum.Enum):
-        UNSPEC = ''
-        CONVERT = 'convert'
-        PRINT = 'print'
-        VERSION = 'version'
-
-    params = types.SimpleNamespace()
-    params.infile = None
-    params.outfile = None
-    action = Action.UNSPEC
-
+def _try_decompress(data, method):
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:', ['convert', 'print', 'version'])
-    except getopt.GetoptError as err:
-        error(err)
+        match method:
+            case 'zlib':
+                return zlib.decompress(data)
+            case 'gzip':
+                return gzip.decompress(data)
+            case _:
+                return None
+    except:
+        return None
 
-    def warn_ignored_action():
-        if action != Action.UNSPEC:
-            warning(f'"{action.value}" action ignored')
+def decompress(filename_in, filename_out):
+    with _open_read(filename_in) as f:
+        data_in = f.read()
 
-    for key, value in opts:
-        match key:
-            case '-o':
-                params.outfile = value
-            case '-c' | '--convert':
-                warn_ignored_action()
-                action = Action.CONVERT
-            case '-p' | '--print':
-                warn_ignored_action()
-                action = Action.PRINT
-            case '--version':
-                action = Action.VERSION
+    print("Decompressing... ")
+    for method in ['gzip', 'zlib']:
+        data_out = _try_decompress(data_in, method)
+        if data_out is not None:
+            print(f'Decompressed using {method} method.')
+            break
+    else:
+        raise InvalidCompressedFileFormat(filename_in)
 
-    try:
-        iargs = iter(args)
-        params.infile = next(iargs)
-        for arg in iargs:
-            warning(f'ignored argument: {arg}')
-    except StopIteration:
-        pass
-    del iargs
-
-    try:
-        match action:
-            case Action.UNSPEC:            
-                print_usage()
-                exit(1)
-            case Action.CONVERT:
-                if params.infile is None:
-                    error('input file required')
-                elif params.outfile is None:
-                    error('output file required')
-                convert(params.infile, params.outfile, period=735)
-            case Action.PRINT:
-                if params.infile is None:
-                    error('input file required')
-                print_(params.infile, params.outfile, period=735)
-            case Action.VERSION:
-                print(f'vgm2fur v{vgm2fur_version}')
-    except AppError as err:
-        error(err)
+    with _open_write(filename_out) as f:
+        f.write(data_out)
+    print('Done.')

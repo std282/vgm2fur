@@ -1,1 +1,1 @@
-from .song import load, Song
+from .song import load, Song, BadVgmFile

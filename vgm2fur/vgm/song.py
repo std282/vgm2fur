@@ -3,11 +3,12 @@ from . import unpacker
 from vgm2fur import AppError as Vgm2FurError
 
 class BadVgmFile(Vgm2FurError):
-    def __init__(self, preamble):
+    def __init__(self, filename, preamble):
         super().__init__(preamble)
+        self.filename = filename
         self.preamble = preamble
     def __str__(self):
-        return f'not a VGM file; preamble {self.preamble}'
+        return f'file "{self.filename}" is not a VGM file'
 
 class UnknownCommand(Vgm2FurError):
     def __init__(self, com):
@@ -19,7 +20,7 @@ class UnknownCommand(Vgm2FurError):
 class Song:
     def __init__(self, data):
         if data[:4] != b'Vgm ':
-            raise BadVgmFile(self.unp.data[0:4])
+            raise BadVgmFile(None)
         self.data = data
 
     def events(self, *chiplist):
@@ -47,7 +48,12 @@ def load(filename):
     except gzip.BadGzipFile:
         with open(filename, 'rb') as f:
             data = f.read()
-    return Song(data)
+
+    try:
+        return Song(data)
+    except BadVgmFile as err:
+        err.filename = filename
+        raise err
 
 def _seek_vgm_data_start(unp):
     unp.offset = 0x34
