@@ -3,6 +3,7 @@ from . import __version__ as vgm2fur_version
 from . import vgm
 from . import furnace
 from . import transform
+from . import AppError
 
 import sys
 import getopt
@@ -138,19 +139,22 @@ def main():
         pass
     del iargs
 
-    match action:
-        case Action.UNSPEC:            
-            print_usage()
-            exit(1)
-        case Action.CONVERT:
-            if params.infile is None:
-                error('input file required')
-            elif params.outfile is None:
-                error('output file required')
-            convert(params.infile, params.outfile, period=735)
-        case Action.PRINT:
-            if params.infile is None:
-                error('input file required')
-            print_(params.infile, params.outfile, period=735)
-        case Action.VERSION:
-            print(f'vgm2fur v{vgm2fur_version}')
+    try:
+        match action:
+            case Action.UNSPEC:            
+                print_usage()
+                exit(1)
+            case Action.CONVERT:
+                if params.infile is None:
+                    error('input file required')
+                elif params.outfile is None:
+                    error('output file required')
+                convert(params.infile, params.outfile, period=735)
+            case Action.PRINT:
+                if params.infile is None:
+                    error('input file required')
+                print_(params.infile, params.outfile, period=735)
+            case Action.VERSION:
+                print(f'vgm2fur v{vgm2fur_version}')
+    except AppError as err:
+        error(err)

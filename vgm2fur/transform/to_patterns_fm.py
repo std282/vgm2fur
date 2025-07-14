@@ -1,6 +1,7 @@
 from typing import NamedTuple
 import bisect
 from vgm2fur import furnace
+from vgm2fur import AppError as Vgm2FurError
 
 def prepare_fm(chip):
     fm1, fm2, fm3, fm4, fm5, fm6 = _split_fm(chip)
@@ -157,17 +158,17 @@ def _to_key_voice(ch):
         key = Key(note=furnace.notes.Off, disp=0, vol=0, id=ch.keyid, opmask=0, pan=ch.pan)
     return key, voice
 
-class Ch3SpNotSupported(Exception):
+class Ch3SpNotSupported(Vgm2FurError):
     def __init__(self):
         super().__init__()
     def __str__(self):
-        return f'channel 3 special mode is not supported'
+        return f'YM2612 FM3 special mode is not supported'
 
-class CsmNotSupported(Exception):
+class CsmNotSupported(Vgm2FurError):
     def __init__(self):
         super().__init__()
     def __str__(self):
-        return f'CSM is not supported'
+        return f'YM2612 CSM is not supported'
 
 def _to_key_voice_mode(ch3):
     if ch3.mode == 0:

@@ -1,14 +1,15 @@
 import gzip
 from . import unpacker
+from vgm2fur import AppError as Vgm2FurError
 
-class BadVgmFile(Exception):
+class BadVgmFile(Vgm2FurError):
     def __init__(self, preamble):
         super().__init__(preamble)
         self.preamble = preamble
     def __str__(self):
         return f'not a VGM file; preamble {self.preamble}'
 
-class UnknownCommand(Exception):
+class UnknownCommand(Vgm2FurError):
     def __init__(self, com):
         super().__init__(com)
         self.com = com
