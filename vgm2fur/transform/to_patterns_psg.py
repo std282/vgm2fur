@@ -8,7 +8,7 @@ def to_patterns_psg(chip):
     psg3 = _channel_data(noted, 2)
     noise = _channel_data(noted, 3)
     return (_transform(psg1, 0), _transform(psg2, 0), _transform(psg3, 1),
-            _transform(noise, 2))
+            _transform_noise(noise))
 
 def _make_psg_note_map():
     freqs = [
@@ -132,3 +132,56 @@ def _transform(psglist, type):
         note_c = note
         disp_c = disp
         vol_c = vol
+
+def _fx_pitch_a(delta):
+    if delta > 0:
+        return furnace.effects.pitch_up(delta)
+    elif delta < 0:
+        return furnace.effects.pitch_down(-delta)
+    else:
+        return None
+
+def _fx_fmode(fmode):
+    return furnace
+
+def _transform_noise(psglist):
+    note_c = furnace.notes.Off
+    vol_c = 0
+    disp_c = 0
+    fmode_c = -1
+    for psgentry in psglist:
+        (note, disp, vol, mode) = psgentry
+        wave = mode >> 2
+        spec = mode & 3
+        fmode = wave | (0x10 if spec == 3 else 0)
+        fx = []
+
+        vol = 15 - vol
+        if vol == 0:
+            note = furnace.notes.Off
+            disp = 0
+        elif spec == 0:
+            note = furnace.notes.A2
+            disp = 0
+        elif spec == 1:
+            note = furnace.notes.A3
+            disp = 0
+        elif spec == 2:
+            note = furnace.notes.A4
+            disp = 0
+
+        if fmode != fmode_c: fx.append(furnace.effects.noise_mode(fmode))
+        if note != note_c:
+            if note == furnace.notes.Off:
+                yield furnace.Entry(note=note, fx=fx)
+            else:
+                if disp != 0: fx.append(_fx_pitch_a(disp))
+                yield furnace.Entry(note=note, ins=0, vol=vol, fx=fx)
+        else:
+            if disp != disp_c: fx.append(_fx_pitch_a(disp - disp_c))
+            vol_o = vol if vol != vol_c else None
+            yield furnace.Entry(vol=vol_o, fx=fx)
+        note_c = note
+        disp_c = disp
+        vol_c = vol
+        fmode_c = fmode
