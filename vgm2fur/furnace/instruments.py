@@ -91,7 +91,7 @@ def _ins_feature_fm(voice):
         op = voice.op[i]
         dt_mult = bitfield.Bitfield()
         dt_mult[3:0] = op.mult
-        dt_mult[6:4] = op.dt if op.dt >= 0 else 4 - op.dt
+        dt_mult[6:4] = 3 + op.dt
         tl = bitfield.Bitfield()
         tl[6:0] = op.tl
         rs_ar = bitfield.Bitfield()
