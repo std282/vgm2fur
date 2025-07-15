@@ -21,23 +21,21 @@ def _tabulate(events):
     return table
 
 def _decimate(table, t_end, period):
+    assert period > 0
     dectable_fm = []
     dectable_psg = []
-    t_end = table[-1].t
-    t = 0
+    t = 0.0
     i = 0
     while t < t_end:
-        while not (table[i].t <= t and t < table[i+1].t) and i < len(table) - 1:
+        while i < len(table) - 1 and not (table[i].t <= t and t < table[i+1].t):
             i += 1
         dectable_fm.append(table[i].fm)
         dectable_psg.append(table[i].psg)
         t += period
     return dectable_fm, dectable_psg
 
-def tabulate(events, /, length, *, period=0, chips):
+def tabulate(events, /, *, length, period, chips):
     events = events(*chips)
-    if period == 0:
-        return _tabulate(events)
     fm, psg = _decimate(_tabulate(events), length, period)
     return_mask = 0
     for chip in chips:

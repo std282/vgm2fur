@@ -9,9 +9,9 @@ import sys
 import getopt
 import enum
 import contextlib
-import types
 import gzip
 import zlib
+from typing import NamedTuple, Any
 
 def main():
     try:
@@ -27,10 +27,7 @@ def _main():
         VERSION = 'version'
         DECOMPRESS = 'decompress'
 
-    params = types.SimpleNamespace()
-    params.infile = None
-    params.outfile = None
-    action = Action.UNSPEC
+    params = ParamList()
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:z', 
@@ -42,54 +39,136 @@ def _main():
         if action != Action.UNSPEC:
             warning(f'"{action.value}" action ignored')
 
+    io_target = {
+        'infile': 'input file', 
+        'outfile': 'output file'
+    }
     for key, value in opts:
+        param = Param(key, value)
         match key:
             case '-o':
-                params.outfile = value
+                params.outfile = param
             case '-c' | '--convert':
-                warn_ignored_action()
                 action = Action.CONVERT
+                params.target = io_target | {'convert': None}
+                params.convert = param
             case '-p' | '--print':
-                warn_ignored_action()
                 action = Action.PRINT
+                params.target = io_target | {'print': None}
+                params.print = param
+                params.outfile = DefaultValue(outfile)
             case '--version':
-                warn_ignored_action()
                 action = Action.VERSION
+                params.target = {'version': None}
+                params.version = param
             case '-z' | '--decompress':
-                warn_ignored_action()
                 action = Action.DECOMPRESS
+                params.target = io_target | {'decompress': None}
+                param.decompress = param
 
     try:
         iargs = iter(args)
-        params.infile = next(iargs)
+        params.infile = Param.positional(next(iargs))
         for arg in iargs:
-            warning(f'ignored argument: {arg}')
+            params.ignored = Param.positional(arg)
     except StopIteration:
         pass
     del iargs
 
+    params.check_target()
     match action:
         case Action.UNSPEC:            
             print_usage()
             exit(1)
         case Action.CONVERT:
-            if params.infile is None:
-                raise NoInputFile()
-            elif params.outfile is None:
-                raise NoOutputFile()
-            convert(params.infile, params.outfile, period=735)
+            convert(params)
         case Action.PRINT:
-            if params.infile is None:
-                raise NoInputFile()
-            print_(params.infile, params.outfile, period=735)
+            print_(params)
         case Action.VERSION:
             print(f'vgm2fur v{vgm2fur_version}')
         case Action.DECOMPRESS:
-            if params.infile is None:
-                raise NoInputFile()
-            elif params.outfile is None:
-                raise NoOutputFile()    
-            decompress(params.infile, params.outfile)
+            decompress(params)
+
+
+class Param(NamedTuple):
+    cl_key: str
+    value: Any = None
+    
+    @classmethod
+    def positional(cls, value):
+        return cls(cl_key=value, value=value)
+
+class DefaultValue:
+    __match_args__ = ['value']
+    def __init__(self, value):
+        self.value = value
+
+class ParamList:
+    def __init__(self):
+        self._paramdict = dict()
+        self._target = None
+
+    @staticmethod
+    def _warn_ignored_parameter(cl_key):
+        if cl_key is not None:
+            warning(f'parameter "{cl_key}" ignored')
+
+    def __getattr__(self, key):
+        try:
+            return self._paramdict[key].value
+        except KeyError:
+            raise AttributeError(f'ParamList object has no attribute "{key}"') from None
+
+    _reserved_fields = frozenset(['_paramdict', '_target', 'target', 'ignored'])
+    def __setattr__(self, key, value):
+        if key in ParamList._reserved_fields:
+            super().__setattr__(key, value)
+        else:
+            self._add_param(key, value)
+
+    def __getitem__(self, key):
+        return self._paramdict[key]
+
+    def __setitem__(self, key, value):
+        self._add_param(key, value)
+
+    def _add_param(self, key, value):
+        match value:
+            case DefaultValue(x):
+                if key not in self._paramdict:
+                    self._paramdict[key] = Param(None, x)
+            case Param(_, _):
+                self._paramdict[key] = value
+                if self._target is not None and key not in self._target:
+                    ParamList._warn_ignored_parameter(value.cl_key)
+            case _:
+                raise ValueError(f'invalid value assign: {value}')
+
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, value):
+        self._target = value
+        present_params = set(self._paramdict.keys())
+        bad_params = present_params - set(self._target.keys())
+        for param in bad_params:
+            paraminfo = self._paramdict[param]
+            ParamList._warn_ignored_parameter(paraminfo.cl_key)
+
+    @property
+    def ignored(self):
+        return None
+
+    @ignored.setter
+    def ignored(self, value):
+        ParamList._warn_ignored_parameter(value.cl_key)
+
+    def check_target(self):
+        for (key, name) in self._target.items():
+            if key not in self._paramdict:
+                raise MissingParameter(name)
 
 class FileOpenReadError(AppError):
     def __init__(self, filename, err):
@@ -121,17 +200,11 @@ class InvalidCompressedFileFormat(AppError):
     def __str__(self):
         return f'unable to decompress file "{self.filename}": unknown file format'
 
-class NoInputFile(AppError):
-    def __init__(self):
-        super().__init__()
+class MissingParameter(AppError):
+    def __init__(self, name):
+        super().__init__(name)
     def __str__(self):
-        return f'no input file provided'
-
-class NoOutputFile(AppError):
-    def __init__(self):
-        super().__init__()
-    def __str__(self):
-        return f'no output file provided'
+        return f'no {self.name} provided'
 
 def _open_read(filename):
     try:
@@ -168,15 +241,17 @@ def print_usage():
   vgm2fur -c input.vgm -o output.fur'''
     print(usage, file=sys.stderr)
 
-def convert(filename_in, filename_out, /, *, period):
+def convert(params):
     try:
-        song = vgm.load(filename_in)
+        song = vgm.load(params.infile)
     except OSError as err:
-        raise FileOpenReadError(filename_in) from None
+        raise FileOpenReadError(params.infile) from None
 
     print('Constructing state table...')
-    fm_chip, psg_chip = transform.tabulate(song.events, song.total_wait,
-        period=period, chips=['ym2612', 'sn76489'])
+    fm_chip, psg_chip = transform.tabulate(song.events, 
+        length=song.total_wait,
+        period=735, 
+        chips=['ym2612', 'sn76489'])
 
     print('Translating state table to tracker events...')
     fur = furnace.Module()
@@ -203,28 +278,26 @@ def convert(filename_in, filename_out, /, *, period):
     print('Writing Furnace module...')
     fur.song_comment = f'Generated with vgm2fur v{vgm2fur_version}'
     result = fur.build()
-    with open(filename_out, 'wb') as f:
+    with open(params.outfile, 'wb') as f:
         f.write(result)
     print('Done.')
 
-def print_(filename_in, filename_out, /, *, period):
+def print_(params):
     try:
-        song = vgm.load(filename_in)
+        song = vgm.load(params.infile)
     except OSError as err:
-        raise FileOpenReadError(filename_in) from None
+        raise FileOpenReadError(params.infile) from None
 
     print('Constructing state table...')
-    results = transform.tabulate(song.events, song.total_wait,
-        period=period, chips=['ym2612', 'sn76489'])
+    results = transform.tabulate(song.events,
+        length=song.total_wait,
+        period=735,
+        chips=['ym2612', 'sn76489'])
 
     print('Writing output...')
-    with open_or(filename_out, 'w', defaultfile=sys.stdout) as f:
-        if period == 0:
-            for (t, fm, psg) in results:
-                print(f'{t: 8d} || {fm} || {psg}', file=f)
-        else:
-            for i, (fm, psg) in enumerate(zip(*results)):
-                print(f'{i: 8d} || {fm} || {psg}', file=f)
+    with open_or(params.outfile, 'w', defaultfile=sys.stdout) as f:
+        for i, (fm, psg) in enumerate(zip(*results)):
+            print(f'{i: 8d} || {fm} || {psg}', file=f)
     print('Done.')
 
 def _try_decompress(data, method):
@@ -239,8 +312,8 @@ def _try_decompress(data, method):
     except:
         return None
 
-def decompress(filename_in, filename_out):
-    with _open_read(filename_in) as f:
+def decompress(params):
+    with _open_read(params.infile) as f:
         data_in = f.read()
 
     print("Decompressing... ")
@@ -250,8 +323,8 @@ def decompress(filename_in, filename_out):
             print(f'Decompressed using {method} method.')
             break
     else:
-        raise InvalidCompressedFileFormat(filename_in)
+        raise InvalidCompressedFileFormat(params.infile)
 
-    with _open_write(filename_out) as f:
+    with _open_write(params.outfile) as f:
         f.write(data_out)
     print('Done.')

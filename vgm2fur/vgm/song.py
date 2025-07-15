@@ -39,7 +39,7 @@ class Song:
 
     @property
     def total_wait(self):
-        return int.from_bytes(self.data[0x18:0x1C])
+        return int.from_bytes(self.data[0x18:0x1C], 'little')
 
 def load(filename):
     try:
