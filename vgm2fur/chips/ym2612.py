@@ -116,18 +116,6 @@ class YM2612:
         clone.update(port, addr, data)
         return clone
 
-    def __str__(self):
-        elements = [
-            f'LFO:{'ENA' if self.lfo_en else 'DIS'}/{self.lfo}',
-            f'FM1 [ {self.channels[0]} ]',
-            f'FM2 [ {self.channels[1]} ]',
-            f'FM3 [ {self.channels[2]} ]',
-            f'FM4 [ {self.channels[3]} ]',
-            f'FM5 [ {self.channels[4]} ]',
-            f'FM6 [ {self.channels[5]} ]',
-        ]
-        return ' '.join(elements)
-
     def clone(self):
         clone = copy.copy(self)
         clone.channels = [ch.clone() for ch in self.channels]
@@ -161,28 +149,6 @@ class Channel:
         return (self._tuple() == other._tuple() and
             all(a == b for (a, b) in zip(self.operators, other.operators)))
 
-    _pan_map = '-RLC'
-    def __str__(self):
-        elements = [
-            f'{self.keyid: 8d}',
-            ''.join(map(lambda x: _OPMASK_MAP[x], f'{self.opmask:04b}')),
-            f'{self.freq:03X}/{self.block} ',
-            f'{self.operators[0].tl:02X}',
-            f'{self.operators[1].tl:02X}',
-            f'{self.operators[2].tl:02X}',
-            f'{self.operators[3].tl:02X} ',
-            f'{self.alg}',
-            f'{Channel._pan_map[self.pan]}',
-            f'{self.fb}',
-            f'{self.pms}',
-            f'{self.ams}',
-            f'OP1 {{ {self.operators[0]} }}',
-            f'OP2 {{ {self.operators[1]} }}',
-            f'OP3 {{ {self.operators[2]} }}',
-            f'OP4 {{ {self.operators[3]} }}',
-        ]
-        return ' '.join(elements)
-
     def clone(self):
         clone = copy.copy(self)
         clone.operators = [op.clone() for op in clone.operators]
@@ -196,52 +162,6 @@ class Channel3(Channel):
         self.operators = [Operator3(), Operator3(), Operator3(), Operator3_4(self)]
 
     _fields = Channel._fields + ['mode']
-
-    def __str__(self):
-        if self.mode == 1:
-            elements = [
-                f'MODE:SP',
-                f'{self.keyid: 8d}',
-                ''.join(map(lambda x: _OPMASK_MAP[x], f'{self.opmask:04b}')),
-                f'{self.operators[0].freq:06X}/{self.operators[0].block}',
-                f'{self.operators[0].tl:02X}',
-                f'{self.operators[1].freq:06X}/{self.operators[1].block}',
-                f'{self.operators[1].tl:02X}',
-                f'{self.operators[2].freq:06X}/{self.operators[2].block}',
-                f'{self.operators[2].tl:02X}',
-                f'{self.operators[3].freq:06X}/{self.operators[3].block}',
-                f'{self.operators[3].tl:02X}',
-                f'{self.alg}',
-                f'{Channel._pan_map[self.pan]}',
-                f'{self.fb}',
-                f'{self.pms}',
-                f'{self.ams}',
-                f'OP1 {{ {self.operators[0]} }}',
-                f'OP2 {{ {self.operators[1]} }}',
-                f'OP3 {{ {self.operators[2]} }}',
-                f'OP4 {{ {self.operators[3]} }}',
-            ]
-        else:
-            elements = [
-                f'MODE:FM',
-                f'{self.keyid: 8d}',
-                ''.join(map(lambda x: _OPMASK_MAP[x], f'{self.opmask:04b}')),
-                f'{self.freq:06X}/{self.block}',
-                f'{self.operators[0].tl:02X}',
-                f'{self.operators[1].tl:02X}',
-                f'{self.operators[2].tl:02X}',
-                f'{self.operators[3].tl:02X}',
-                f'{self.alg}',
-                f'{Channel._pan_map[self.pan]}',
-                f'{self.fb}',
-                f'{self.pms}',
-                f'{self.ams}',
-                f'OP1 {{ {self.operators[0]} }}',
-                f'OP2 {{ {self.operators[1]} }}',
-                f'OP3 {{ {self.operators[2]} }}',
-                f'OP4 {{ {self.operators[3]} }}',
-            ]
-        return ' '.join(elements)
 
     def clone(self):
         clone = copy.copy(self)
@@ -260,28 +180,6 @@ class Channel6(Channel):
         self.dac_en = 0
 
     _fields = Channel._fields + ['dac_en']
-
-    def __str__(self):
-        elements = [
-            f'DAC:{'ENA' if self.dac_en else 'DIS'}',
-            f'{self.keyid: 8d}',
-            ''.join(map(lambda x: _OPMASK_MAP[x], f'{self.opmask:04b}')),
-            f'{self.freq:03X}/{self.block} ',
-            f'{self.operators[0].tl:02X}',
-            f'{self.operators[1].tl:02X}',
-            f'{self.operators[2].tl:02X}',
-            f'{self.operators[3].tl:02X} ',
-            f'{self.alg}',
-            f'{Channel._pan_map[self.pan]}',
-            f'{self.fb}',
-            f'{self.pms}',
-            f'{self.ams}',
-            f'OP1 {{ {self.operators[0]} }}',
-            f'OP2 {{ {self.operators[1]} }}',
-            f'OP3 {{ {self.operators[2]} }}',
-            f'OP4 {{ {self.operators[3]} }}',
-        ]
-        return ' '.join(elements)
 
 class Operator:
     def __init__(self):
@@ -307,21 +205,6 @@ class Operator:
 
     def __eq__(self, other):
         return self._tuple() == other._tuple()
-
-    def __str__(self):
-        elements = [
-            f'MULT:{self.mult:02d}',
-            f'DT:{self.dt:+2d}',
-            f'AR:{self.ar:02d}',
-            f'RS:{self.rs}',
-            f'DR:{self.dr:02d}',
-            f'AM:{self.am}',
-            f'SR:{self.sr:02d}',
-            f'RR:{self.rr:02d}',
-            f'SL:{self.sl:02d}',
-            f'SSG:{'ENA' if self.ssg_en else 'DIS'}/{self.ssg}',
-        ]
-        return ' '.join(elements)
 
     def clone(self):
         return copy.copy(self)
@@ -356,3 +239,175 @@ class Operator3_4(Operator):
 
 
 _OPMASK_MAP = {'0': '.', '1': '#'}
+
+_CHIP_FEATURES = frozenset('lfo dac fm1 fm2 fm3 fm4 fm5 fm6 fmx freqfm3'.split())
+_CHANNEL_FEATURES = frozenset('id opmask freqfm alg fb mod pan op1 op2 op3 op4 opx'.split())
+_OPERATOR_FEATURES = frozenset('mult dt tl ar rs dr am sr rr sl ssg'.split())
+def csv(chip_states, src_features):
+    ymft = []
+    chft = []
+    opft = []
+    for feature in src_features:
+        if feature in _CHIP_FEATURES:
+            ymft.append(feature)
+        elif feature in _CHANNEL_FEATURES:
+            chft.append(feature)
+        elif feature in _OPERATOR_FEATURES:
+            opft.append(feature)
+
+    ymft = _norm_chip(ymft)
+    chft = _norm_channel(chft)
+    opft = _norm_operator(opft)
+
+    yield _csv_header(ymft, chft, opft)
+    for chip in chip_states:
+        yield _csv_chip(chip, ymft, chft, opft)
+
+def _norm_chip(fts):
+    fts1 = []
+    for ft in fts:
+        match ft:
+            case 'fmx':
+                fts1 += 'fm1 fm2 fm3 fm4 fm5 fm6'.split()
+            case _:
+                fts1.append(ft)
+    return fts1
+
+def _norm_channel(fts):
+    fts1 = []
+    for ft in fts:
+        match ft:
+            case 'opx':
+                fts1 += 'op1 op2 op3 op4'.split()
+            case _:
+                fts1.append(ft)
+    return fts1
+
+def _norm_operator(fts):
+    fts1 = []
+    for ft in fts:
+        match ft:
+            case 'parx':
+                fts1 += 'mult dt tl ar rs dr am sr rr sl ssg'.split()
+            case _:
+                fts1.append(ft)
+    return fts1
+
+def _csv_header(ymfts, chfts, opfts):
+    ss = []
+    for ymft in ymfts:
+        match ymft:
+            case 'lfo': s = 'LFO En,LFO'
+            case 'dac': s = 'DAC En'
+            case 'freqfm3': 
+                s = ','.join([
+                    'FM3 Sp En',
+                    'FM3 Sp OP1 Freq', 'FM3 Sp OP1 Blk',
+                    'FM3 Sp OP2 Freq', 'FM3 Sp OP2 Blk',
+                    'FM3 Sp OP3 Freq', 'FM3 Sp OP3 Blk',
+                    'FM3 Sp OP4 Freq', 'FM3 Sp OP4 Blk'])
+            case 'fm1' | 'fm2' | 'fm3' | 'fm4' | 'fm5' | 'fm6': 
+                chname = ymft.upper() + ' '
+                ss1 = []
+                for chft in chfts:
+                    match chft:
+                        case 'id': s1 = chname + 'Key ID'
+                        case 'opmask': s1 = chname + 'OP Mask'
+                        case 'freqfm': s1 = chname + 'Freq,' + chname + 'Block'
+                        case 'alg': s1 = chname + 'Alg'
+                        case 'fb': s1 = chname + 'Fb'
+                        case 'mod': s1 = chname + 'AMS,' + chname + 'PMS'
+                        case 'pan': s1 = chname + 'Pan'
+                        case 'op1' | 'op2' | 'op3' | 'op4':
+                            opname = chname + chft.upper() + ' '
+                            ss2 = []
+                            for opft in opfts:
+                                match opft:
+                                    case 'mult': s2 = opname + 'Mult'
+                                    case 'dt': s2 = opname + 'Dt'
+                                    case 'tl' | 'ar' | 'rs' | 'dr' | 'am' | 'sr' | 'rr' | 'sl':
+                                        s2 = opname + opft.upper()
+                                    case 'ssg': s2 = opname + 'SSG En,' + opname + 'SSG'
+                                ss2.append(s2)
+                            s1 = ','.join(ss2)
+                    ss1.append(s1)
+                s = ','.join(ss1)
+        ss.append(s)
+    return ','.join(ss)
+
+def _csv_chip(ym, ymft, chft, opft):
+    ss = []
+    for ft in ymft:
+        match ft:
+            case 'lfo': s = f'{ym.lfo_en},{ym.lfo}'
+            case 'dac': s = f'{ym.ch(6).dac_en}'
+            case 'freq3sp':
+                ch3 = ym.ch(3)
+                if ch3.mode:
+                    ss1 = ['1']
+                    for op in map(lambda n: ch3.op(n), range(1, 5)):
+                        ss1.append(f'{op.freq},{op.block}')
+                    s = ','.join(ss1)
+                else:
+                    s = '0,,,,,,,,'
+            case 'fm1' | 'fm2' | 'fm3' | 'fm4' | 'fm5':
+                n = int(ft[2])
+                s = _csv_channel(ym.ch(n), chft, opft)
+            case 'fm6':
+                ch = ym.ch(6)
+                if ch.dac_en:
+                    s = _csv_channel_empty(chft, opft)
+                else:
+                    s = _csv_channel(ch, chft, opft)
+        ss.append(s)
+    return ','.join(ss)
+
+def _csv_channel(ch, chft, opft):
+    ss = []
+    for ft in chft:
+        match ft:
+            case 'id': s = f'{ch.keyid}'
+            case 'opmask': s = f'{ch.opmask}'
+            case 'freqfm': s = f'{ch.freq},{ch.block}'
+            case 'alg': s = f'{ch.alg}'
+            case 'fb': s = f'{ch.fb}'
+            case 'mod': s = f'{ch.ams},{ch.pms}'
+            case 'pan': s = f'{ch.pan}'
+            case 'op1' | 'op2' | 'op3' | 'op4':
+                n = int(ft[2])
+                s = _csv_operator(ch.op(n), opft)
+        ss.append(s)
+    return ','.join(ss)
+
+def _csv_channel_empty(chft, opft):
+    ss = []
+    for ft in chft:
+        match ft:
+            case 'op1' | 'op2' | 'op3' | 'op4':
+                s = _csv_operator_empty(opft)
+        ss.append(s)
+    return ','.join(ss)
+
+def _csv_operator(op, opft):
+    ss = []
+    for ft in opft:
+        match ft:
+            case 'mult': s = f'{op.mult}'
+            case 'dt': s = f'{op.dt}'
+            case 'tl': s = f'{op.tl}'
+            case 'ar': s = f'{op.ar}'
+            case 'rs': s = f'{op.rs}'
+            case 'dr': s = f'{op.dr}'
+            case 'am': s = f'{op.am}'
+            case 'sr': s = f'{op.sr}'
+            case 'rr': s = f'{op.rr}'
+            case 'sl': s = f'{op.sl}'
+            case 'ssg': s = f'{op.ssg_en},{op.ssg}'
+        ss.append(s)
+    return ','.join(ss)
+
+def _csv_operator_empty(opft):
+    ss = []
+    for _ in opft:
+        ss.append('')
+    return ','.join(ss)

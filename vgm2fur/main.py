@@ -1,8 +1,6 @@
 from . import __version__ as vgm2fur_version
 
-from . import vgm
-from . import furnace
-from . import transform
+from . import vgm, furnace, transform, chips
 from . import AppError
 
 import sys
@@ -11,6 +9,7 @@ import enum
 import contextlib
 import gzip
 import zlib
+import itertools
 from typing import NamedTuple, Any
 
 def main():
@@ -23,15 +22,15 @@ def _main():
     class Action(enum.Enum):
         UNSPEC = ''
         CONVERT = 'convert'
-        PRINT = 'print'
+        PRINT_CSV = 'print-csv'
         VERSION = 'version'
         DECOMPRESS = 'decompress'
 
     params = ParamList()
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'cpo:z', 
-            ['convert', 'print', 'version', 'decompress'])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'ct:o:z', 
+            ['convert', 'print-csv=', 'version', 'decompress'])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -52,11 +51,11 @@ def _main():
                 action = Action.CONVERT
                 params.target = io_target | {'convert': None}
                 params.convert = param
-            case '-p' | '--print':
-                action = Action.PRINT
-                params.target = io_target | {'print': None}
-                params.print = param
-                params.outfile = DefaultValue(outfile)
+            case '-t' | '--print-csv':
+                action = Action.PRINT_CSV
+                params.target = io_target | {'csv_features': 'CSV feature list'}
+                params.csv_features = param
+                params.outfile = DefaultValue(None)
             case '--version':
                 action = Action.VERSION
                 params.target = {'version': None}
@@ -82,8 +81,8 @@ def _main():
             exit(1)
         case Action.CONVERT:
             convert(params)
-        case Action.PRINT:
-            print_(params)
+        case Action.PRINT_CSV:
+            print_csv(params)
         case Action.VERSION:
             print(f'vgm2fur v{vgm2fur_version}')
         case Action.DECOMPRESS:
@@ -99,7 +98,7 @@ class Param(NamedTuple):
         return cls(cl_key=value, value=value)
 
 class DefaultValue:
-    __match_args__ = ['value']
+    __match_args__ = ('value', )
     def __init__(self, value):
         self.value = value
 
@@ -218,28 +217,32 @@ def _open_write(filename):
     except OSError as err:
         raise FileOpenWriteError(filename, err)
 
+def _open_write_text(filename):
+    try:
+        return open(filename, 'w')
+    except OSError as err:
+        raise FileOpenWriteError(filename, err)
+
 @contextlib.contextmanager
 def _open_write_or(filename, /, *, defaultfile):
     if filename is None:
         yield defaultfile
     else:
-        file = _open_write(filename)
+        file = _open_write_text(filename)
         try:
             yield file
         finally:
             file.close()
 
+def eprint(*args, **kwargs):
+    print(*args, **kwargs, file=sys.stderr)
+
 def warning(message):
-    print(f'warning: {message}')
+    eprint(f'warning: {message}')
 
 def error(message):
-    print(f'error: {message}', file=sys.stderr)
+    eprint(f'error: {message}')
     exit(1)
-
-def print_usage():
-    usage = '''usage:
-  vgm2fur -c input.vgm -o output.fur'''
-    print(usage, file=sys.stderr)
 
 def convert(params):
     try:
@@ -247,13 +250,13 @@ def convert(params):
     except OSError as err:
         raise FileOpenReadError(params.infile) from None
 
-    print('Constructing state table...')
+    eprint('Constructing state table...')
     fm_chip, psg_chip = transform.tabulate(song.events, 
         length=song.total_wait,
         period=735, 
         chips=['ym2612', 'sn76489'])
 
-    print('Translating state table to tracker events...')
+    eprint('Translating state table to tracker events...')
     fur = furnace.Module()
 
     psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
@@ -275,30 +278,44 @@ def convert(params):
     fur.add_patterns(transform.to_patterns_fm(fm5, voices), 'fm5')
     fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')
 
-    print('Writing Furnace module...')
+    eprint('Writing Furnace module...')
     fur.song_comment = f'Generated with vgm2fur v{vgm2fur_version}'
     result = fur.build()
     with open(params.outfile, 'wb') as f:
         f.write(result)
-    print('Done.')
+    eprint('Done.')
 
-def print_(params):
+def print_csv(params):
     try:
         song = vgm.load(params.infile)
     except OSError as err:
         raise FileOpenReadError(params.infile) from None
 
-    print('Constructing state table...')
-    results = transform.tabulate(song.events,
+    row_duration = 735
+    pattern_length = 128
+
+    features = params.csv_features.split(',')
+    if len(features) == 0:
+        raise MissingParameter('CSV feature list')
+
+    eprint('Constructing state table...')
+    fm, psg = transform.tabulate(song.events,
         length=song.total_wait,
-        period=735,
+        period=row_duration,
         chips=['ym2612', 'sn76489'])
 
-    print('Writing output...')
-    with open_or(params.outfile, 'w', defaultfile=sys.stdout) as f:
-        for i, (fm, psg) in enumerate(zip(*results)):
-            print(f'{i: 8d} || {fm} || {psg}', file=f)
-    print('Done.')
+    eprint('Writing output...')
+    fm = chips.ym2612_csv(fm, features)
+    psg = chips.sn76489_csv(psg, features)
+    icsv = iter(zip(itertools.count(-1), fm, psg))
+    with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
+        (_, csv_fm, csv_psg) = next(icsv)
+        print(','.join(['Pat:Row', csv_fm, csv_psg]), file=f)
+        for (n, csv_fm, csv_psg) in icsv:
+            pat = n // pattern_length
+            row = n % pattern_length
+            print(','.join([f'{pat}:{row}', csv_fm, csv_psg]), file=f)
+    eprint('Done.')
 
 def _try_decompress(data, method):
     try:
@@ -328,3 +345,8 @@ def decompress(params):
     with _open_write(params.outfile) as f:
         f.write(data_out)
     print('Done.')
+
+def print_usage():
+    usage = '''usage:
+  vgm2fur -c input.vgm -o output.fur'''
+    eprint(usage)

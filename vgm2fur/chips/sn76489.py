@@ -65,11 +65,77 @@ class SN76489:
         clone.update(data)
         return clone
 
-    def __str__(self):
-        elements = [
-            f'PSG1: {self.tonal[0].freq:03X} {self.tonal[0].vol:X}',
-            f'PSG2: {self.tonal[1].freq:03X} {self.tonal[1].vol:X}',
-            f'PSG3: {self.tonal[2].freq:03X} {self.tonal[2].vol:X}',
-            f'NOISE: {self.noise.mode:X} {self.noise.vol:X}',
-        ]
-        return '  '.join(elements)
+def csv(chip_states, src_features):
+    snft = []
+    toft = []
+    noft = []
+    for feature in src_features:
+        match feature:
+            case 'psg1' | 'psg2' | 'psg3' | 'noise':
+                snft.append(feature)
+            case 'psgt':
+                snft += 'psg1 psg2 psg3'.split()
+            case 'psgx':
+                snft += 'psg1 psg2 psg3 noise'.split()
+            case 'vol':
+                toft.append(feature)
+                noft.append(feature)
+            case 'freqpsg':
+                toft.append(feature)
+            case 'nmode':
+                noft.append(feature)
+
+    yield _csv_header(snft, toft, noft)
+    for chip in chip_states:
+        yield _csv_chip(chip, snft, toft, noft)
+
+def _csv_header(snfts, tofts, nofts):
+    ss = []
+    for snft in snfts:
+        match snft:
+            case 'psg1' | 'psg2' | 'psg3':
+                ss1 = []
+                chname = snft.upper() + ' '
+                for toft in tofts:
+                    match toft:
+                        case 'vol': s1 = chname + 'Vol'
+                        case 'freqpsg': s1 = chname + 'Freq'
+                    ss1.append(s1)
+                s = ','.join(ss1)
+            case 'noise':
+                ss1 = []
+                chname = snft.upper() + ' '
+                for toft in tofts:
+                    match toft:
+                        case 'vol': s1 = chname + 'Vol'
+                        case 'nmode': s1 = chname + 'Freq'
+                    ss1.append(s1)
+                s = ','.join(ss1)
+        ss.append(s)
+    return ','.join(ss)
+
+
+def _csv_chip(psg, snfts, tofts, nofts):
+    ss = []
+    for snft in snfts:
+        match snft:
+            case 'psg1' | 'psg2' | 'psg3':
+                ss1 = []
+                ch = psg.tonal[int(snft[3]) - 1]
+                for toft in tofts:
+                    match toft:
+                        case 'vol': s1 = f'{ch.vol}'
+                        case 'freqpsg': s1 = f'{ch.freq}'
+                    ss1.append(s1)
+                s = ','.join(ss1)
+            case 'noise':
+                ss1 = []
+                ch = psg.noise
+                for toft in tofts:
+                    match toft:
+                        case 'vol': s1 = f'{ch.vol}'
+                        case 'nmode': s1 = f'{ch.mode}'
+                    ss1.append(s1)
+                s = ','.join(ss1)
+        ss.append(s)
+    return ','.join(ss)
