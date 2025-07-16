@@ -1,4 +1,4 @@
-__version__ = '0.2.dev1'
+__version__ = '0.2'
 
 class AppError(Exception):
     pass

@@ -22,6 +22,16 @@ pipx install <path-to-wheel-file>
 
 After installation you'll be able to call ``vgm2fur`` from your OS shell.
 
+To uninstall, run a command:
+```
+pip uninstall vgm2fur
+```
+or 
+```
+pipx uninstall vgm2fur
+```
+depending on which was used to install.
+
 ## Usage
 
 Suppose you have a VGM file ``input.vgm`` and you want to convert it to ``output.fur`` file.
@@ -29,8 +39,20 @@ Said conversion is performed by running a command:
 ```
 vgm2fur -c input.vgm -o output.fur
 ```
+or 
+```
+vgm2fur input.vgm -co output.fur
+```
+(vgm2fur follows [GNU Program Argument Syntax Conventions](https://www.gnu.org/software/libc/manual/html_node/Argument-Syntax.html).)
 
 Input VGM file can be either compressed or uncompressed.
+
+You can append to the command one or more following options. `iii` means integer value, `fff` means floating point value.
+- `--pattern-length=iii` - sets Furnace pattern length, in rows (default is 128).
+- `--row-duration=fff` - sets duration of a single Furnace row, in samples (1 sample = 1/44100 sec)
+- `--playback-rate=fff` - sets playback rate in Hz (how many rows will get played per second).
+- `--skip-samples=iii` - skips initial `iii` samples before starting conversion. Can be useful to get rid of silence at start.
+- `--ym2612-volume=fff`, `--sn76489-volume` - sets corresponding chip volume, default is 1
 
 ## Limitations
 
