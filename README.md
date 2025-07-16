@@ -5,7 +5,7 @@ A Python CLI application that allows to convert VGM files to Furnace modules.
 ## Installation
 
 **Prerequisites**:
-- Python 3.13 or later
+- Python 3.10 or later
 
 **Installation steps**:
 - Download wheel file from the latest release;
