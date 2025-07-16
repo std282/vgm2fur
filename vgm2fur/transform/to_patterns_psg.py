@@ -45,7 +45,7 @@ def _find_best_note(freq):
         diff_l = freq - freq_l
         diff_r = freq - freq_r
         candidates = [(note_l, diff_l), (note_r, diff_r)]
-    elif i >= len(PSG_NOTE_MAP) - 2:
+    elif i > len(PSG_NOTE_MAP) - 2:
         (note_l, freq_l) = PSG_NOTE_MAP[-2]
         (note_r, freq_r) = PSG_NOTE_MAP[-1]
         diff_l = freq - freq_l

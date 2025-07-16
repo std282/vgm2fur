@@ -104,7 +104,7 @@ def _find_best_note_bisect(freq, freq_map):
         diff_l = freq - freq_l
         diff_r = freq - freq_r
         candidates = [(note_l, diff_l), (note_r, diff_r)]
-    elif i >= len(freq_map) - 2:
+    elif i > len(freq_map) - 2:
         (note_l, freq_l) = freq_map[-2]
         (note_r, freq_r) = freq_map[-1]
         diff_l = freq - freq_l
