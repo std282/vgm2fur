@@ -9,18 +9,18 @@ def _make_entry_data(note, ins, vol, fx):
     payload = b''
     if note is not None:
         mask |= 1
-        payload += note.to_bytes(1)
+        payload += builder.byte(note)
     if ins is not None:
         mask |= 2
-        payload += ins.to_bytes(1)
+        payload += builder.byte(ins)
     if vol is not None:
         mask |= 4
-        payload += vol.to_bytes(1)
+        payload += builder.byte(vol)
     if fx is not None and len(fx) > 0:
         if len(fx) == 1:
             mask |= 8 | 16
             (fxtype, fxval) = fx[0]
-            payload += fxtype.to_bytes(1) + fxval.to_bytes(1)
+            payload += builder.byte(fxtype) + builder.byte(fxval)
         else:
             if len(fx) > 8: fx = fx[:8]
             if len(fx) <= 4:
@@ -31,7 +31,7 @@ def _make_entry_data(note, ins, vol, fx):
                 masklen = 3
             m = 256 | 512
             for fxtype, fxval in fx:
-                payload += fxtype.to_bytes(1) + fxval.to_bytes(1)
+                payload += builder.byte(fxtype) + builder.byte(fxval)
                 mask |= m
                 m <<= 2
     return mask.to_bytes(masklen, 'little') + payload
@@ -86,7 +86,7 @@ def _skip_n(n):
         n -= 128
     if n >= 2:
         n = (n - 2) + 0x80
-        yield n.to_bytes(1)
+        yield builder.byte(n)
     else:
         yield b'\0'
 
@@ -363,7 +363,7 @@ def _make_instrument_asset_dir(instcount):
         builder.long(1),  # no. of dirs
         builder.string(''),  # dir name
         builder.short(instcount),  # no. of assets in dir
-        b''.join(x.to_bytes(1) for x in range(instcount))  # assets in dir
+        b''.join(builder.byte(x) for x in range(instcount))  # assets in dir
     ]
     adir[1] = builder.long(builder.bl_length(adir[2:]))
     return b''.join(adir)

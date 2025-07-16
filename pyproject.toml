@@ -7,7 +7,7 @@ name = "vgm2fur"
 authors = [
   {name = "std282"}
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 license = "MIT"
 dynamic = ["version"]
 

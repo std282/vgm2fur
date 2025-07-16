@@ -80,9 +80,9 @@ def _ins_feature_fm(voice):
     feature = [
         b'FM',
         builder.short(0), # length
-        flags.all.to_bytes(1),
-        alg_fb.all.to_bytes(1),
-        ams_fms.all.to_bytes(1),
+        builder.byte(flags.all),
+        builder.byte(alg_fb.all),
+        builder.byte(ams_fms.all),
         builder.byte(0),
         builder.byte(0),
     ]
@@ -113,13 +113,13 @@ def _ins_feature_fm(voice):
         ssg[2:0] = op.ssg
         ssg[3] = op.ssg_en
         feature += [
-            dt_mult.all.to_bytes(1),
-            tl.all.to_bytes(1),
-            rs_ar.all.to_bytes(1),
-            am_dr.all.to_bytes(1),
-            kvs_sr.all.to_bytes(1),
-            sl_rr.all.to_bytes(1),
-            ssg.all.to_bytes(1),
+            builder.byte(dt_mult.all),
+            builder.byte(tl.all),
+            builder.byte(rs_ar.all),
+            builder.byte(am_dr.all),
+            builder.byte(kvs_sr.all),
+            builder.byte(sl_rr.all),
+            builder.byte(ssg.all),
             builder.byte(0),
         ]
     feature[1] = builder.short(builder.bl_length(feature[2:]))
