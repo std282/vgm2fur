@@ -1,5 +1,21 @@
 from vgm2fur import bitfield
 import copy
+import warnings
+
+class IllFormedEvent(Exception):
+    def __init__(self, eventdata):
+        super().__init__(eventdata)
+        self.eventdata = eventdata
+    def __str__(self):
+        return 'ill-formed VGM command: ' + self._repr_data() + '; ignored'
+    def _repr_data(self):
+        elems = []
+        for x in self.eventdata:
+            if x is None:
+                elems.append('??')
+            else:
+                elems.append(f'{x:02X}')
+        return ' '.join(elems)
 
 class YM2612:
     def __init__(self):
@@ -15,19 +31,28 @@ class YM2612:
     _op_map = [0, 2, 1, 3]
     def _get_op(self, port, addr):
         addr = bitfield.make(addr)
-        ch = addr[1:0] + port * 3
+        subch = addr[1:0]
+        if subch == 3:
+            raise IllFormedEvent((0x52 if port == 0 else 0x53, addr.all, None))
+        ch = subch + port * 3
         op = YM2612._op_map[addr[3:2]]
         return self.channels[ch].operators[op]
 
     def _get_ch(self, port, addr):
         addr = bitfield.make(addr)
-        ch = addr[1:0] + port * 3
+        subch = addr[1:0]
+        if subch == 3:
+            raise IllFormedEvent((0x52 if port == 0 else 0x53, addr.all, None))
+        ch = subch + port * 3
         return self.channels[ch]
 
     _ch3_op_map = [2, 0, 1]
     def _get_ch3_op(self, addr):
         addr = bitfield.make(addr)
-        op = YM2612._ch3_op_map[addr[1:0]]
+        index = addr[1:0]
+        if index == 3:
+            raise IllFormedEvent((0x52, addr.all, None))
+        op = YM2612._ch3_op_map[index]
         return self.channels[2].operators[op]
 
     def __eq__(self, other):
@@ -40,78 +65,84 @@ class YM2612:
     def update(self, port, addr, data):
         self.regs[port * 0xC0 + addr] = data
         data = bitfield.make(data)
-        match (port, addr):
-            case (0, 0x22):
-                self.lfo = data[2:0]
-                self.lfo_en = data[3]
-            case (0, 0x27):
-                self.ch(3).mode = data[7:6]
-            case (0, 0x28):
-                i = data[2:0] % 4 + 3 * (data[2:0] // 4)
-                self.channels[i].opmask = data[7:4]
-                self.channels[i].keyid += 1
-            case (0, 0x2B):
-                self.ch(6).dac_en = data[7]
-            case (p, a) if (a & 0xF0) == 0x30:
-                op = self._get_op(p, a)
-                op.mult = data[3:0]
-                if data[6] == 0:
-                    op.dt = data[5:4]
-                else:
-                    op.dt = -data[5:4]
-            case (p, a) if (a & 0xF0) == 0x40:
-                self._get_op(p, a).tl = data[6:0]
-            case (p, a) if (a & 0xF0) == 0x50:
-                op = self._get_op(p, a)
-                op.ar = data[4:0]
-                op.rs = data[7:6]
-            case (p, a) if (a & 0xF0) == 0x60:
-                op = self._get_op(p, a)
-                op.dr = data[4:0]
-                op.am = data[7]
-            case (p, a) if (a & 0xF0) == 0x70:
-                self._get_op(p, a).sr = data[4:0]
-            case (p, a) if (a & 0xF0) == 0x80:
-                op = self._get_op(p, a)
-                op.rr = data[3:0]
-                op.sl = data[7:4]
-            case (p, a) if (a & 0xF0) == 0x90:
-                op = self._get_op(p, a)
-                op.ssg = data[2:0]
-                op.ssg_en = data[3]
-            case (p, a) if (a & 0xFC) == 0xA0:
-                ch = self._get_ch(p, a)
-                freq = bitfield.make(ch.freq)
-                freq[7:0] = data[7:0]
-                ch.freq = freq.all
-            case (p, a) if (a & 0xFC) == 0xA4:
-                ch = self._get_ch(p, a)
-                freq = bitfield.make(ch.freq)
-                freq[10:8] = data[2:0]
-                ch.freq = freq.all
-                ch.block = data[5:3]
-            case (0, a) if (a & 0xFC) == 0xA8:
-                op = self._get_ch3_op(a)
-                freq = bitfield.make(op.freq)
-                freq[7:0] = data[7:0]
-                op.freq = freq.all
-            case (0, a) if (a & 0xFC) == 0xAC:
-                op = self._get_ch3_op(a)
-                freq = bitfield.make(op.freq)
-                freq[10:8] = data[2:0]
-                op.freq = freq.all
-                op.block = data[5:3]
-            case (p, a) if (a & 0xFC) == 0xB0:
-                ch = self._get_ch(p, a)
-                ch.alg = data[2:0]
-                ch.fb = data[5:3]
-            case (p, a) if (a & 0xFC) == 0xB4:
-                ch = self._get_ch(p, a)
-                ch.pms = data[2:0]
-                ch.ams = data[5:4]
-                ch.pan = data[7:6]
-            case _:
-                pass
+        try:
+            match (port, addr):
+                case (0, 0x22):
+                    self.lfo = data[2:0]
+                    self.lfo_en = data[3]
+                case (0, 0x27):
+                    self.ch(3).mode = data[7:6]
+                case (0, 0x28):
+                    subch = data[1:0]
+                    if subch == 3:
+                        raise IllFormedEvent((0x52, 0x28, data.all))
+                    i = subch + 3 * data[2]
+                    self.channels[i].opmask = data[7:4]
+                    self.channels[i].keyid += 1
+                case (0, 0x2B):
+                    self.ch(6).dac_en = data[7]
+                case (p, a) if (a & 0xF0) == 0x30:
+                    op = self._get_op(p, a)
+                    op.mult = data[3:0]
+                    if data[6] == 0:
+                        op.dt = data[5:4]
+                    else:
+                        op.dt = -data[5:4]
+                case (p, a) if (a & 0xF0) == 0x40:
+                    self._get_op(p, a).tl = data[6:0]
+                case (p, a) if (a & 0xF0) == 0x50:
+                    op = self._get_op(p, a)
+                    op.ar = data[4:0]
+                    op.rs = data[7:6]
+                case (p, a) if (a & 0xF0) == 0x60:
+                    op = self._get_op(p, a)
+                    op.dr = data[4:0]
+                    op.am = data[7]
+                case (p, a) if (a & 0xF0) == 0x70:
+                    self._get_op(p, a).sr = data[4:0]
+                case (p, a) if (a & 0xF0) == 0x80:
+                    op = self._get_op(p, a)
+                    op.rr = data[3:0]
+                    op.sl = data[7:4]
+                case (p, a) if (a & 0xF0) == 0x90:
+                    op = self._get_op(p, a)
+                    op.ssg = data[2:0]
+                    op.ssg_en = data[3]
+                case (p, a) if (a & 0xFC) == 0xA0:
+                    ch = self._get_ch(p, a)
+                    freq = bitfield.make(ch.freq)
+                    freq[7:0] = data[7:0]
+                    ch.freq = freq.all
+                case (p, a) if (a & 0xFC) == 0xA4:
+                    ch = self._get_ch(p, a)
+                    freq = bitfield.make(ch.freq)
+                    freq[10:8] = data[2:0]
+                    ch.freq = freq.all
+                    ch.block = data[5:3]
+                case (0, a) if (a & 0xFC) == 0xA8:
+                    op = self._get_ch3_op(a)
+                    freq = bitfield.make(op.freq)
+                    freq[7:0] = data[7:0]
+                    op.freq = freq.all
+                case (0, a) if (a & 0xFC) == 0xAC:
+                    op = self._get_ch3_op(a)
+                    freq = bitfield.make(op.freq)
+                    freq[10:8] = data[2:0]
+                    op.freq = freq.all
+                    op.block = data[5:3]
+                case (p, a) if (a & 0xFC) == 0xB0:
+                    ch = self._get_ch(p, a)
+                    ch.alg = data[2:0]
+                    ch.fb = data[5:3]
+                case (p, a) if (a & 0xFC) == 0xB4:
+                    ch = self._get_ch(p, a)
+                    ch.pms = data[2:0]
+                    ch.ams = data[5:4]
+                    ch.pan = data[7:6]
+                case _:
+                    pass
+        except IllFormedEvent as err:
+            warnings.warn(str(err))
 
     def updated(self, port, addr, data):
         clone = self.clone()

@@ -10,6 +10,7 @@ import contextlib
 import gzip
 import zlib
 import itertools
+import warnings
 from typing import NamedTuple, Any
 
 def main():
@@ -36,10 +37,6 @@ def _main():
             'skip-samples=', 'sn76489-volume=', 'ym2612-volume='])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
-
-    def warn_ignored_action():
-        if action != Action.UNSPEC:
-            warning(f'"{action.value}" action ignored')
 
     io_target = {
         'infile': 'input file',
@@ -163,7 +160,7 @@ class ParamList:
     @staticmethod
     def _warn_ignored_parameter(cl_key):
         if cl_key is not None:
-            warning(f'parameter "{cl_key}" ignored')
+            warnings.warn(f'parameter "{cl_key}" ignored')
 
     def __getattr__(self, key):
         try:
@@ -311,12 +308,11 @@ def _open_write_or(filename, /, *, defaultfile):
 def eprint(*args, **kwargs):
     print(*args, **kwargs, file=sys.stderr)
 
-def warning(message):
-    eprint(f'warning: {message}')
-
-def error(message):
-    eprint(f'error: {message}')
-    exit(1)
+def _warning(message, category, filename, lineno, file=None, line=None):
+    if file is None:
+        file = sys.stderr
+    print(f'warning: {message}', file=file)
+warnings.showwarning = _warning
 
 def convert(params):
     try:
