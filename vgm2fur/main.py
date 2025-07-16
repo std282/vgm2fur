@@ -32,7 +32,7 @@ def _main():
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z', 
             ['convert', 'print-istate=', 'version', 'decompress', 'unsampled', 
-            'print-vgm'])
+            'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length='])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -51,17 +51,29 @@ def _main():
                 params.outfile = param
             case '-c' | '--convert':
                 action = Action.CONVERT
-                params.target = io_target | {'convert': None}
+                params.target = io_target | {
+                    'convert': '',
+                    'pattern_length': 'pattern length',
+                    'row_duration': 'row duration',
+                    'playback_rate': 'playback rate',
+                }
                 params.convert = param
+                params.playback_rate = DefaultValue(None)
+                params.row_duration = DefaultValue(None)
+                params.pattern_length = DefaultValue(128)
             case '--print-istate':
                 action = Action.PRINT_ISTATE
                 params.target = io_target | {
                     'csv_features': 'CSV feature list',
-                    'unsampled': ''
+                    'unsampled': '',
+                    'pattern_length': 'pattern length',
+                    'row_duration': 'row duration',
                 }
                 params.csv_features = param
                 params.outfile = DefaultValue(None)
                 params.unsampled = DefaultValue(False)
+                params.pattern_length = DefaultValue(128)
+                params.row_duration = DefaultValue(735)
             case '--version':
                 action = Action.VERSION
                 params.target = {'version': None}
@@ -76,6 +88,15 @@ def _main():
                 action = Action.PRINT_VGM
                 params.target = io_target
                 params.outfile = DefaultValue(None)
+            case '--pattern-length':
+                params.pattern_length = _parse_param(param, int)
+                _assert_param(params['pattern_length'], lambda x: 0 < x and x <= 256)
+            case '--row-duration':
+                params.row_duration = _parse_param(param, float)
+                _assert_param(params['row_duration'], lambda x: x > 0)
+            case '--playback-rate':
+                params.playback_rate = _parse_param(param, float)
+                _assert_param(params['playback_rate'], lambda x: x > 0)
 
     try:
         iargs = iter(args)
@@ -88,7 +109,7 @@ def _main():
 
     params.check_target()
     match action:
-        case Action.UNSPEC:            
+        case Action.UNSPEC:
             print_usage()
             exit(1)
         case Action.CONVERT:
@@ -101,7 +122,6 @@ def _main():
             decompress(params)
         case Action.PRINT_VGM:
             print_vgm(params)
-
 
 class Param(NamedTuple):
     cl_key: str
@@ -216,8 +236,29 @@ class InvalidCompressedFileFormat(AppError):
 class MissingParameter(AppError):
     def __init__(self, name):
         super().__init__(name)
+        self.name = name
     def __str__(self):
         return f'no {self.name} provided'
+
+class InvalidParameter(AppError):
+    def __init__(self, param):
+        super().__init__(param)
+        self.param = param
+    def __str__(self):
+        return f'parameter "{self.param[0]}" has invalid value: "{self.param[1]}"'
+
+def _parse_param(param, parse):
+    try:
+        if type(param[1]) is str:
+            return Param(param[0], parse(param[1]))
+        else:
+            return param
+    except ValueError:
+        raise InvalidParameter(param)
+
+def _assert_param(param, cond):
+    if not cond(param[1]):
+        raise InvalidParameter(param)
 
 def _open_read(filename):
     try:
@@ -264,14 +305,33 @@ def convert(params):
     except OSError as err:
         raise FileOpenReadError(params.infile) from None
 
+    match (params.row_duration, params.playback_rate, song.playback_rate):
+        case (None, None, 0):
+            row_duration = 735.0
+            playback_rate = 60.0
+        case (None, None, z):
+            row_duration = vgm.SAMPLE_RATE / z
+            playback_rate = z
+        case (x, None, _):
+            row_duration = x
+            playback_rate = vgm.SAMPLE_RATE / x
+        case (None, y, _):
+            row_duration = vgm.SAMPLE_RATE / y
+            playback_rate = y
+        case (x, y, _):
+            row_duration = x
+            playback_rate = y
+
     eprint('Constructing state table...')
     fm_chip, psg_chip = transform.tabulate(song.events, 
         length=song.total_wait,
-        period=735, 
+        period=row_duration, 
         chips=['ym2612', 'sn76489'])
 
     eprint('Translating state table to tracker events...')
     fur = furnace.Module()
+    fur.ticks_per_second = playback_rate
+    fur.pattern_length = params.pattern_length
 
     psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
     fur.add_instrument(furnace.instr.psg_blank('PSG_BLANK'))
@@ -323,13 +383,12 @@ def print_istate(params):
                 print(','.join([t_csv, csv_fm, csv_psg]), file=f)
         eprint('Done.')
     else:
-        row_duration = 735
-        pattern_length = 128
+        pattern_length = params.pattern_length
 
         eprint('Constructing state table...')
         fm, psg = transform.tabulate(song.events,
             length=song.total_wait,
-            period=row_duration,
+            period=params.row_duration,
             chips=['ym2612', 'sn76489'])
 
         eprint('Writing output...')

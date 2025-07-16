@@ -42,6 +42,10 @@ class Song:
     def total_wait(self):
         return int.from_bytes(self.data[0x18:0x1C], 'little')
 
+    @property
+    def playback_rate(self):
+        return int.from_bytes(self.data[0x24:0x28], 'little')
+
 def load(filename):
     try:
         with gzip.open(filename) as f:
