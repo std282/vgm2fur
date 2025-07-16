@@ -33,7 +33,9 @@ class YM2612:
     def __eq__(self, other):
         # return (self._tuple() == other._tuple() and
         #     all(a == b for (a, b) in zip(self.channels, other.channels)))
-        return bytes(self.regs) == bytes(other.regs)
+        return (
+            bytes(self.regs) == bytes(other.regs) and 
+            all(a.keyid == b.keyid for (a, b) in zip(self.channels, other.channels)))
 
     def update(self, port, addr, data):
         self.regs[port * 0xC0 + addr] = data

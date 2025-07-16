@@ -22,15 +22,17 @@ def _main():
     class Action(enum.Enum):
         UNSPEC = ''
         CONVERT = 'convert'
-        PRINT_CSV = 'print-csv'
+        PRINT_ISTATE = 'print-istate'
         VERSION = 'version'
         DECOMPRESS = 'decompress'
+        PRINT_VGM = 'print-vgm'
 
     params = ParamList()
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'ct:o:z', 
-            ['convert', 'print-csv=', 'version', 'decompress', 'unsampled'])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z', 
+            ['convert', 'print-istate=', 'version', 'decompress', 'unsampled', 
+            'print-vgm'])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -51,8 +53,8 @@ def _main():
                 action = Action.CONVERT
                 params.target = io_target | {'convert': None}
                 params.convert = param
-            case '-t' | '--print-csv':
-                action = Action.PRINT_CSV
+            case '--print-istate':
+                action = Action.PRINT_ISTATE
                 params.target = io_target | {
                     'csv_features': 'CSV feature list',
                     'unsampled': ''
@@ -70,6 +72,10 @@ def _main():
                 param.decompress = param
             case '--unsampled':
                 params.unsampled = Param(key, True)
+            case '--print-vgm':
+                action = Action.PRINT_VGM
+                params.target = io_target
+                params.outfile = DefaultValue(None)
 
     try:
         iargs = iter(args)
@@ -87,12 +93,14 @@ def _main():
             exit(1)
         case Action.CONVERT:
             convert(params)
-        case Action.PRINT_CSV:
-            print_csv(params)
+        case Action.PRINT_ISTATE:
+            print_istate(params)
         case Action.VERSION:
             print(f'vgm2fur v{vgm2fur_version}')
         case Action.DECOMPRESS:
             decompress(params)
+        case Action.PRINT_VGM:
+            print_vgm(params)
 
 
 class Param(NamedTuple):
@@ -291,7 +299,7 @@ def convert(params):
         f.write(result)
     eprint('Done.')
 
-def print_csv(params):
+def print_istate(params):
     try:
         song = vgm.load(params.infile)
     except OSError as err:
@@ -370,3 +378,15 @@ def print_usage():
     usage = '''usage:
   vgm2fur -c input.vgm -o output.fur'''
     eprint(usage)
+
+def print_vgm(params):
+    try:
+        song = vgm.load(params.infile)
+    except OSError as err:
+        raise FileOpenReadError(params.infile) from None
+
+    eprint('Writing output...')
+    with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
+        for csv in vgm.events_csv(song.events('ym2612', 'sn76489')):
+            print(csv, file=f)
+    eprint('Done.')

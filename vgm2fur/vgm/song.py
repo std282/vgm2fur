@@ -1,6 +1,7 @@
 import gzip
 from . import unpacker
 from vgm2fur import AppError as Vgm2FurError
+from vgm2fur import bitfield
 
 class BadVgmFile(Vgm2FurError):
     def __init__(self, filename, preamble):
@@ -102,3 +103,118 @@ def _events(unp):
                     raise UnknownCommand(com)
     except unpacker.NoDataError:
         pass
+
+def events_csv(events):
+    t = 0
+    yield 'Sample,Description,Raw data'
+    for event in events:
+        rawdata = ' '.join(f'{x:02X}' for x in event)
+        wait = 0
+        match event[0]:
+            case 0x52 | 0x53:
+                port = event[0] & 1
+                addr = event[1]
+                d = bitfield.make(event[2])
+                match (port, addr):
+                    case (0, 0x22):
+                        res = 'En' if d[3] else 'Dis'
+                        descr = f'YM2612 LFO {res} Val={d[2:0]}'
+                    case (0, 0x27):
+                        fm3mode = ['normal', 'special', 'CSM', '??']
+                        descr = f'YM2612 FM3 mode: {fm3mode[d[7:6]]}'
+                    case (0, 0x28):
+                        i = d[2:0] % 4 + 3 * (d[2:0] // 4)
+                        opmask = d[7:4]
+                        if opmask == 0:
+                            descr = f'FM{i+1} key off'
+                        else:
+                            descr = f'FM{i+1} key on ({opmask:X})'
+                    case (0, 0x2B):
+                        res = 'En' if d[7] else 'Dis'
+                        descr = f'YM2612 DAC {res}'
+                    case (p, a) if (a & 0xF0) == 0x30:
+                        dt = d[5:4] if d[6] == 0 else -d[5:4]
+                        descr = _fm_op(p, a) + f'Mult={d[3:0]} Dt={dt}'
+                    case (p, a) if (a & 0xF0) == 0x40:
+                        descr = _fm_op(p, a) + f'TL={d[6:0]}'
+                    case (p, a) if (a & 0xF0) == 0x50:
+                        descr = _fm_op(p, a) + f'AR={d[4:0]} RS={d[6:0]}'
+                    case (p, a) if (a & 0xF0) == 0x60:
+                        op = _fm_op(p, a)
+                        descr = _fm_op(p, a) + f'DR={d[4:0]} AM={d[7]}'
+                    case (p, a) if (a & 0xF0) == 0x70:
+                        descr = _fm_op(p, a) + f'SR={d[4:0]}'
+                    case (p, a) if (a & 0xF0) == 0x80:
+                        descr = _fm_op(p, a) + f'RR={d[3:0]} SL={d[7:4]}'
+                    case (p, a) if (a & 0xF0) == 0x90:
+                        res = 'En' if d[3] else 'Dis'
+                        descr = _fm_op(p, a) + f'SSG {res} = {d[2:0]}'
+                    case (p, a) if (a & 0xFC) == 0xA0:
+                        descr = _fm_ch(p, a) + f'FreqL={d[7:0]}'
+                    case (p, a) if (a & 0xFC) == 0xA4:
+                        descr = _fm_ch(p, a) + f'FreqH={d[2:0]} Block={d[5:3]}'
+                    case (0, a) if (a & 0xFC) == 0xA8:
+                        descr = _fm_ch3_op(a) + f'FreqL={d[7:0]}'
+                    case (0, a) if (a & 0xFC) == 0xAC:
+                        descr = _fm_ch3_op(a) + f'FreqH={d[2:0]} Block={d[5:3]}'
+                    case (p, a) if (a & 0xFC) == 0xB0:
+                        descr = _fm_ch(p, a) + f'Alg={d[2:0]} FB={d[5:3]}'
+                    case (p, a) if (a & 0xFC) == 0xB4:
+                        descr = _fm_ch(p, a) + f'AMS={d[2:0]} PMS={d[5:4]} Pan={d[7:6]}'
+                    case _:
+                        descr = 'YM2612 unrecognized command'
+            case 0x50:
+                d = bitfield.make(event[1])
+                if d[7]:
+                    if d[4]:
+                        ch = f'PSG{1+d[6:5]}' if d[6:5] != 3 else 'PSG Noise'
+                        descr = 'SN76489 ' + ch + f'Vol={d[3:0]}'
+                    elif d[6:5] != 3:
+                        chno = 1+d[6:5]
+                        descr = f'SN76489 PSG{chno} FreqL={d[3:0]}'
+                    else:
+                        descr = f'SN76489 PSG Noise Mode={d[3:0]}'
+                else:
+                    descr = f'SN76489 PSG^ FreqH={d[5:0]}'
+            case 0x61:
+                wait = event[1] + (event[2] << 8)
+                descr = f'Wait {wait} samples'
+            case 0x62:
+                wait = 735
+                descr = f'Wait {wait} samples'
+                t += wait
+            case 0x63:
+                wait = 882
+                descr = f'Wait {wait} samples'
+                t += wait
+            case _ if (event[0] & 0xF0) == 0x70:
+                wait = 1 + (event[0] & 0x0F)
+                descr = f'Wait {wait} samples'
+            case _ if (event[0] & 0xF0) == 0x80:
+                wait = event[0] & 0x0F
+                if wait == 0:
+                    descr = 'Play sample'
+                else:
+                    descr = f'Play sample and wait {wait} samples'
+            case _:
+                descr = ''
+        yield f'{t},{descr},{rawdata}'
+        t += wait
+
+def _fm_op(port, addr):
+    _op_map = [1, 3, 2, 4]
+    addr = bitfield.make(addr)
+    ch = 1 + addr[1:0] + port * 3
+    op = _op_map[addr[3:2]]
+    return f'YM2612 FM{ch} OP{op} '
+
+def _fm_ch(port, addr):
+    addr = bitfield.make(addr)
+    ch = 1 + addr[1:0] + port * 3
+    return f'YM2612 FM{ch} '
+
+def _fm_ch3_op(addr):
+    _ch3_op_map = [3, 1, 2]
+    addr = bitfield.make(addr)
+    op = _ch3_op_map[addr[1:0]]
+    return f'YM2612 FM3 OP{op} '
