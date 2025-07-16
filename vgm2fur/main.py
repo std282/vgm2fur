@@ -32,7 +32,8 @@ def _main():
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z', 
             ['convert', 'print-istate=', 'version', 'decompress', 'unsampled', 
-            'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length='])
+            'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length=',
+            'skip-samples='])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -56,11 +57,13 @@ def _main():
                     'pattern_length': 'pattern length',
                     'row_duration': 'row duration',
                     'playback_rate': 'playback rate',
+                    'skip_samples': 'skipped samples count'
                 }
                 params.convert = param
                 params.playback_rate = DefaultValue(None)
                 params.row_duration = DefaultValue(None)
                 params.pattern_length = DefaultValue(128)
+                params.skip_samples = DefaultValue(0)
             case '--print-istate':
                 action = Action.PRINT_ISTATE
                 params.target = io_target | {
@@ -68,12 +71,14 @@ def _main():
                     'unsampled': '',
                     'pattern_length': 'pattern length',
                     'row_duration': 'row duration',
+                    'skip_samples': 'skipped samples count'
                 }
                 params.csv_features = param
                 params.outfile = DefaultValue(None)
                 params.unsampled = DefaultValue(False)
                 params.pattern_length = DefaultValue(128)
                 params.row_duration = DefaultValue(735)
+                params.skip_samples = DefaultValue(0)
             case '--version':
                 action = Action.VERSION
                 params.target = {'version': None}
@@ -97,6 +102,9 @@ def _main():
             case '--playback-rate':
                 params.playback_rate = _parse_param(param, float)
                 _assert_param(params['playback_rate'], lambda x: x > 0)
+            case '--skip-samples':
+                params.skip_samples = _parse_param(param, float)
+                _assert_param(params['skip_samples'], lambda x: x >= 0)
 
     try:
         iargs = iter(args)
@@ -326,7 +334,8 @@ def convert(params):
     fm_chip, psg_chip = transform.tabulate(song.events, 
         length=song.total_wait,
         period=row_duration, 
-        chips=['ym2612', 'sn76489'])
+        chips=['ym2612', 'sn76489'],
+        skip=params.skip_samples)
 
     eprint('Translating state table to tracker events...')
     fur = furnace.Module()
@@ -389,7 +398,8 @@ def print_istate(params):
         fm, psg = transform.tabulate(song.events,
             length=song.total_wait,
             period=params.row_duration,
-            chips=['ym2612', 'sn76489'])
+            chips=['ym2612', 'sn76489'],
+            skip=params.skip_samples)
 
         eprint('Writing output...')
         fm = chips.ym2612_csv(fm, features)

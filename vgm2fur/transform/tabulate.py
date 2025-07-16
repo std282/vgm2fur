@@ -20,11 +20,11 @@ def _tabulate(events):
                 t += delta_t
     return table
 
-def _decimate(table, t_end, period):
+def _decimate(table, t_end, period, start):
     assert period > 0
     dectable_fm = []
     dectable_psg = []
-    t = 0.0
+    t = start
     i = 0
     while t < t_end:
         while i < len(table) - 1 and not (table[i].t <= t and t < table[i+1].t):
@@ -46,9 +46,9 @@ def tabulate_unsampled(events, /, *, chips):
         psgs.append(psg)
     return (ts, fms, psgs)
 
-def tabulate(events, /, *, length, period, chips):
+def tabulate(events, /, *, length, period, chips, skip):
     events = events(*chips)
-    fm, psg = _decimate(_tabulate(events), length, period)
+    fm, psg = _decimate(_tabulate(events), length, period, skip)
     return_mask = 0
     for chip in chips:
         match chip.lower():
