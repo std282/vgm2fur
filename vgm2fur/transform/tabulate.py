@@ -34,6 +34,18 @@ def _decimate(table, t_end, period):
         t += period
     return dectable_fm, dectable_psg
 
+def tabulate_unsampled(events, /, *, chips):
+    events = events(*chips)
+    table = _tabulate(events)
+    ts = []
+    fms = []
+    psgs = []
+    for (t, fm, psg) in table:
+        ts.append(t)
+        fms.append(fm)
+        psgs.append(psg)
+    return (ts, fms, psgs)
+
 def tabulate(events, /, *, length, period, chips):
     events = events(*chips)
     fm, psg = _decimate(_tabulate(events), length, period)

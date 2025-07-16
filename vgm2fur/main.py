@@ -30,7 +30,7 @@ def _main():
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'ct:o:z', 
-            ['convert', 'print-csv=', 'version', 'decompress'])
+            ['convert', 'print-csv=', 'version', 'decompress', 'unsampled'])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -53,9 +53,13 @@ def _main():
                 params.convert = param
             case '-t' | '--print-csv':
                 action = Action.PRINT_CSV
-                params.target = io_target | {'csv_features': 'CSV feature list'}
+                params.target = io_target | {
+                    'csv_features': 'CSV feature list',
+                    'unsampled': ''
+                }
                 params.csv_features = param
                 params.outfile = DefaultValue(None)
+                params.unsampled = DefaultValue(False)
             case '--version':
                 action = Action.VERSION
                 params.target = {'version': None}
@@ -64,6 +68,8 @@ def _main():
                 action = Action.DECOMPRESS
                 params.target = io_target | {'decompress': None}
                 param.decompress = param
+            case '--unsampled':
+                params.unsampled = Param(key, True)
 
     try:
         iargs = iter(args)
@@ -291,31 +297,45 @@ def print_csv(params):
     except OSError as err:
         raise FileOpenReadError(params.infile) from None
 
-    row_duration = 735
-    pattern_length = 128
-
     features = params.csv_features.split(',')
     if len(features) == 0:
         raise MissingParameter('CSV feature list')
 
-    eprint('Constructing state table...')
-    fm, psg = transform.tabulate(song.events,
-        length=song.total_wait,
-        period=row_duration,
-        chips=['ym2612', 'sn76489'])
+    if params.unsampled:
+        eprint('Constructing state table...')
+        t, fm, psg = transform.tabulate_unsampled(song.events, 
+            chips=['ym2612', 'sn76489'])
 
-    eprint('Writing output...')
-    fm = chips.ym2612_csv(fm, features)
-    psg = chips.sn76489_csv(psg, features)
-    icsv = iter(zip(itertools.count(-1), fm, psg))
-    with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
-        (_, csv_fm, csv_psg) = next(icsv)
-        print(','.join(['Pat:Row', csv_fm, csv_psg]), file=f)
-        for (n, csv_fm, csv_psg) in icsv:
-            pat = n // pattern_length
-            row = n % pattern_length
-            print(','.join([f'{pat}:{row}', csv_fm, csv_psg]), file=f)
-    eprint('Done.')
+        eprint('Writing output...')
+        fm = chips.ym2612_csv(fm, features)
+        psg = chips.sn76489_csv(psg, features)
+        t = ['Sample'] + list(map(str, t))
+        with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
+            for (t_csv, csv_fm, csv_psg) in zip(t, fm, psg):
+                print(','.join([t_csv, csv_fm, csv_psg]), file=f)
+        eprint('Done.')
+    else:
+        row_duration = 735
+        pattern_length = 128
+
+        eprint('Constructing state table...')
+        fm, psg = transform.tabulate(song.events,
+            length=song.total_wait,
+            period=row_duration,
+            chips=['ym2612', 'sn76489'])
+
+        eprint('Writing output...')
+        fm = chips.ym2612_csv(fm, features)
+        psg = chips.sn76489_csv(psg, features)
+        icsv = iter(zip(itertools.count(-1), fm, psg))
+        with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
+            (_, csv_fm, csv_psg) = next(icsv)
+            print(','.join(['Pat:Row', csv_fm, csv_psg]), file=f)
+            for (n, csv_fm, csv_psg) in icsv:
+                pat = n // pattern_length
+                row = n % pattern_length
+                print(','.join([f'{pat}:{row}', csv_fm, csv_psg]), file=f)
+        eprint('Done.')
 
 def _try_decompress(data, method):
     try:
