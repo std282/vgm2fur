@@ -30,10 +30,10 @@ def _main():
     params = ParamList()
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z', 
-            ['convert', 'print-istate=', 'version', 'decompress', 'unsampled', 
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z',
+            ['convert', 'print-istate=', 'version', 'decompress', 'unsampled',
             'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length=',
-            'skip-samples='])
+            'skip-samples=', 'sn76489-volume=', 'ym2612-volume='])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -42,7 +42,7 @@ def _main():
             warning(f'"{action.value}" action ignored')
 
     io_target = {
-        'infile': 'input file', 
+        'infile': 'input file',
         'outfile': 'output file'
     }
     for key, value in opts:
@@ -57,13 +57,17 @@ def _main():
                     'pattern_length': 'pattern length',
                     'row_duration': 'row duration',
                     'playback_rate': 'playback rate',
-                    'skip_samples': 'skipped samples count'
+                    'skip_samples': 'skipped samples count',
+                    'ym2612_volume': 'YM2612 volume',
+                    'sn76489_volume': 'SN76489 volume',
                 }
                 params.convert = param
                 params.playback_rate = DefaultValue(None)
                 params.row_duration = DefaultValue(None)
                 params.pattern_length = DefaultValue(128)
                 params.skip_samples = DefaultValue(0)
+                params.ym2612_volume = DefaultValue(1.0)
+                params.sn76489_volume = DefaultValue(1.0)
             case '--print-istate':
                 action = Action.PRINT_ISTATE
                 params.target = io_target | {
@@ -105,6 +109,13 @@ def _main():
             case '--skip-samples':
                 params.skip_samples = _parse_param(param, float)
                 _assert_param(params['skip_samples'], lambda x: x >= 0)
+            case '--ym2612-volume':
+                params.ym2612_volume = _parse_param(param, float)
+                _assert_param(params['ym2612_volume'], lambda x: x >= 0)
+            case '--sn76489-volume':
+                params.sn76489_volume = _parse_param(param, float)
+                _assert_param(params['sn76489_volume'], lambda x: x >= 0)
+
 
     try:
         iargs = iter(args)
@@ -134,7 +145,7 @@ def _main():
 class Param(NamedTuple):
     cl_key: str
     value: Any = None
-    
+
     @classmethod
     def positional(cls, value):
         return cls(cl_key=value, value=value)
@@ -311,7 +322,7 @@ def convert(params):
     try:
         song = vgm.load(params.infile)
     except OSError as err:
-        raise FileOpenReadError(params.infile) from None
+        raise FileOpenReadError(params.infile, err) from None
 
     match (params.row_duration, params.playback_rate, song.playback_rate):
         case (None, None, 0):
@@ -331,9 +342,9 @@ def convert(params):
             playback_rate = y
 
     eprint('Constructing state table...')
-    fm_chip, psg_chip = transform.tabulate(song.events, 
+    fm_chip, psg_chip = transform.tabulate(song.events,
         length=song.total_wait,
-        period=row_duration, 
+        period=row_duration,
         chips=['ym2612', 'sn76489'],
         skip=params.skip_samples)
 
@@ -361,6 +372,9 @@ def convert(params):
     fur.add_patterns(transform.to_patterns_fm(fm5, voices), 'fm5')
     fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')
 
+    fur.ym2612_volume = params.ym2612_volume
+    fur.sn76489_volume = params.sn76489_volume
+
     eprint('Writing Furnace module...')
     fur.song_comment = f'Generated with vgm2fur v{vgm2fur_version}'
     result = fur.build()
@@ -372,7 +386,7 @@ def print_istate(params):
     try:
         song = vgm.load(params.infile)
     except OSError as err:
-        raise FileOpenReadError(params.infile) from None
+        raise FileOpenReadError(params.infile, err) from None
 
     features = params.csv_features.split(',')
     if len(features) == 0:
@@ -380,7 +394,7 @@ def print_istate(params):
 
     if params.unsampled:
         eprint('Constructing state table...')
-        t, fm, psg = transform.tabulate_unsampled(song.events, 
+        t, fm, psg = transform.tabulate_unsampled(song.events,
             chips=['ym2612', 'sn76489'])
 
         eprint('Writing output...')
@@ -452,7 +466,7 @@ def print_vgm(params):
     try:
         song = vgm.load(params.infile)
     except OSError as err:
-        raise FileOpenReadError(params.infile) from None
+        raise FileOpenReadError(params.infile, err) from None
 
     eprint('Writing output...')
     with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
