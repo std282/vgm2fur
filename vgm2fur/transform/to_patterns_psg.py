@@ -99,7 +99,8 @@ def _transform(psglist, type):
                 silent = False
             case 1: # psg3
                 (note, disp, vol, mode) = psgentry
-                silent = ((mode & 3) == 3)
+                # silent = ((mode & 3) == 3)
+                silent = False
             case 2: # noise
                 (note, disp, vol, mode) = psgentry
                 silent = ((mode & 3) != 3)
