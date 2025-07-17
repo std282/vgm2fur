@@ -11,6 +11,7 @@ import gzip
 import zlib
 import itertools
 import warnings
+import os
 from typing import NamedTuple, Any
 
 def main():
@@ -21,18 +22,19 @@ def main():
 
 def _main():
     class Action(enum.Enum):
-        UNSPEC = ''
-        CONVERT = 'convert'
-        PRINT_ISTATE = 'print-istate'
-        VERSION = 'version'
-        DECOMPRESS = 'decompress'
-        PRINT_VGM = 'print-vgm'
+        UNSPEC = 0
+        CONVERT = 1
+        PRINT_ISTATE = 2
+        VERSION = 3
+        DECOMPRESS = 4
+        PRINT_VGM = 5
 
     params = ParamList()
+    action = Action.UNSPEC
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'co:z',
-            ['convert', 'print-istate=', 'version', 'decompress', 'unsampled',
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:z',
+            ['print-istate=', 'version', 'decompress', 'unsampled',
             'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length=',
             'skip-samples=', 'sn76489-volume=', 'ym2612-volume='])
     except getopt.GetoptError as err:
@@ -47,24 +49,6 @@ def _main():
         match key:
             case '-o':
                 params.outfile = param
-            case '-c' | '--convert':
-                action = Action.CONVERT
-                params.target = io_target | {
-                    'convert': '',
-                    'pattern_length': 'pattern length',
-                    'row_duration': 'row duration',
-                    'playback_rate': 'playback rate',
-                    'skip_samples': 'skipped samples count',
-                    'ym2612_volume': 'YM2612 volume',
-                    'sn76489_volume': 'SN76489 volume',
-                }
-                params.convert = param
-                params.playback_rate = DefaultValue(None)
-                params.row_duration = DefaultValue(None)
-                params.pattern_length = DefaultValue(128)
-                params.skip_samples = DefaultValue(0)
-                params.ym2612_volume = DefaultValue(1.0)
-                params.sn76489_volume = DefaultValue(1.0)
             case '--print-istate':
                 action = Action.PRINT_ISTATE
                 params.target = io_target | {
@@ -117,6 +101,23 @@ def _main():
     try:
         iargs = iter(args)
         params.infile = Param.positional(next(iargs))
+        if action == Action.UNSPEC:
+            action = Action.CONVERT
+            params.target = io_target | {
+                'pattern_length': 'pattern length',
+                'row_duration': 'row duration',
+                'playback_rate': 'playback rate',
+                'skip_samples': 'skipped samples count',
+                'ym2612_volume': 'YM2612 volume',
+                'sn76489_volume': 'SN76489 volume',
+            }
+            params.outfile = DefaultValue(None)
+            params.playback_rate = DefaultValue(None)
+            params.row_duration = DefaultValue(None)
+            params.pattern_length = DefaultValue(128)
+            params.skip_samples = DefaultValue(0)
+            params.ym2612_volume = DefaultValue(1.0)
+            params.sn76489_volume = DefaultValue(1.0)
         for arg in iargs:
             params.ignored = Param.positional(arg)
     except StopIteration:
@@ -215,6 +216,8 @@ class ParamList:
         ParamList._warn_ignored_parameter(value.cl_key)
 
     def check_target(self):
+        if self._target is None:
+            return
         for (key, name) in self._target.items():
             if key not in self._paramdict:
                 raise MissingParameter(name)
@@ -315,8 +318,9 @@ def _warning(message, category, filename, lineno, file=None, line=None):
 warnings.showwarning = _warning
 
 def convert(params):
+    infile = params.infile
     try:
-        song = vgm.load(params.infile)
+        song = vgm.load(infile)
     except OSError as err:
         raise FileOpenReadError(params.infile, err) from None
 
@@ -382,7 +386,13 @@ def convert(params):
     eprint('Writing Furnace module...')
     fur.song_comment = f'Generated with vgm2fur v{vgm2fur_version}'
     result = fur.build()
-    with open(params.outfile, 'wb') as f:
+
+    outfile = params.outfile
+    if outfile is None:
+        base, ext = os.path.splitext(infile)
+        outfile = base + '.fur'
+
+    with open(outfile, 'wb') as f:
         f.write(result)
     eprint('Done.')
 
@@ -463,7 +473,7 @@ def decompress(params):
 
 def print_usage():
     usage = '''usage:
-  vgm2fur -c input.vgm -o output.fur'''
+  vgm2fur input.vgm -o output.fur'''
     eprint(usage)
 
 def print_vgm(params):
