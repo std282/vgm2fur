@@ -157,7 +157,7 @@ class Module:
         self.channel_count = 10
         self.pattern_length = 128
         self.ticks_per_second = 60
-        self.pattern_matrix = [list() for _ in range(self.channel_count)]
+        self.pattern_matrix = [[] for _ in range(self.channel_count)]
         self.effects_count = [1] * self.channel_count
         self.order_count = 0
         self.pattern_count = 0
@@ -165,26 +165,62 @@ class Module:
         self.ym2612_volume = 1.0
         self.sn76489_volume = 1.0
         self.song_comment = ''
+        self._fm3sp = False
 
     @property
     def instrument_count(self):
         return len(self.instruments)
 
+    @property
+    def fm3_special_mode(self):
+        return self._fm3sp
+
+    @fm3_special_mode.setter
+    def fm3_special_mode(self, value):
+        self._fm3sp = value
+        assert self._fm3sp  # no turning back for now
+
+        self.channel_count = 13
+        if len(self.pattern_matrix) != self.channel_count:
+            self.pattern_matrix = (self.pattern_matrix[:2] 
+                + [[] for _ in range(3)] + self.pattern_matrix[2:])
+        if len(self.effects_count != self.effects_count):
+            self.effects_count = (self.effects_count[:2]
+                + [1, 1, 1] + self.effects_count[2:])
+
     def add_patterns(self, entries, channel):
         if type(channel) is str:
-            match channel.lower():
-                case 'fm1': channel = 0
-                case 'fm2': channel = 1
-                case 'fm3': channel = 2
-                case 'fm4': channel = 3
-                case 'fm5': channel = 4
-                case 'fm6': channel = 5
-                case 'psg1': channel = 6
-                case 'psg2': channel = 7
-                case 'psg3': channel = 8
-                case 'psg4' | 'noise': channel = 9
-                case _:
-                    raise TypeError('invalid value for "channel"')
+            if self.fm3_special_mode:
+                match channel.lower():
+                    case 'fm1': channel = 0
+                    case 'fm2': channel = 1
+                    case 'fm3o1': channel = 2
+                    case 'fm3o2': channel = 3
+                    case 'fm3o3': channel = 4
+                    case 'fm3o4': channel = 5
+                    case 'fm4': channel = 6
+                    case 'fm5': channel = 7
+                    case 'fm6': channel = 8
+                    case 'psg1': channel = 9
+                    case 'psg2': channel = 10
+                    case 'psg3': channel = 11
+                    case 'psg4' | 'noise': channel = 12
+                    case _:
+                        raise TypeError('invalid value for "channel"')
+            else:
+                match channel.lower():
+                    case 'fm1': channel = 0
+                    case 'fm2': channel = 1
+                    case 'fm3': channel = 2
+                    case 'fm4': channel = 3
+                    case 'fm5': channel = 4
+                    case 'fm6': channel = 5
+                    case 'psg1': channel = 6
+                    case 'psg2': channel = 7
+                    case 'psg3': channel = 8
+                    case 'psg4' | 'noise': channel = 9
+                    case _:
+                        raise TypeError('invalid value for "channel"')
         else:
             raise TypeError('invalid type for "channel"')
 
@@ -233,6 +269,11 @@ class Module:
         file += header
         fileptr += len(header)
 
+        if self.fm3_special_mode:
+            system = 0x42
+        else:
+            system = 0x02
+
         info = [
             b'INFO',
             builder.long(0),   # size
@@ -249,7 +290,7 @@ class Module:
             builder.short(0),  # wavetable count
             builder.short(0),  # sample count
             builder.long(self.pattern_count),
-            builder.byte(2),   # system: Genesis
+            builder.byte(system),  # system: Genesis or Genesis FM3 sp.
             builder.byte(0) * 31,  # end of system list + 30 bytes padding
             builder.byte(0x40) * 32,  # for compatibility
             builder.byte(0) * 32,  # for compatibility

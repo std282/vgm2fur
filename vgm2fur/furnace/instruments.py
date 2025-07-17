@@ -24,6 +24,7 @@ class FMVoice(NamedTuple):
     ams: int
     pms: int
     op: tuple[FMOp, FMOp, FMOp, FMOp]
+    ch3: bool
 
 def fm_opn(voice, name=''):
     ins = [

@@ -363,7 +363,15 @@ def convert(params):
         fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
     fur.add_patterns(transform.to_patterns_fm(fm1, voices), 'fm1')
     fur.add_patterns(transform.to_patterns_fm(fm2, voices), 'fm2')
-    fur.add_patterns(transform.to_patterns_fm3(fm3, voices), 'fm3')
+    if transform.is_fm3_special_mode(fm3):
+        fm3o1, fm3o2, fm3o3, fm3o4 = transform.split_fm3_special_mode(fm3)
+        fur.fm3_special_mode = True
+        fur.add_patterns(transform.to_patterns_fm(fm3o1, voices), 'fm3o1')
+        fur.add_patterns(transform.to_patterns_fm(fm3o2, voices), 'fm3o2')
+        fur.add_patterns(transform.to_patterns_fm(fm3o3, voices), 'fm3o3')
+        fur.add_patterns(transform.to_patterns_fm(fm3o4, voices), 'fm3o4')
+    else:
+        fur.add_patterns(transform.to_patterns_fm(fm3, voices), 'fm3')
     fur.add_patterns(transform.to_patterns_fm(fm4, voices), 'fm4')
     fur.add_patterns(transform.to_patterns_fm(fm5, voices), 'fm5')
     fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')

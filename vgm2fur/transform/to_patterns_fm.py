@@ -1,26 +1,41 @@
 from typing import NamedTuple
 import bisect
-from vgm2fur import furnace
+from vgm2fur import furnace, bitfield
 from vgm2fur import AppError as Vgm2FurError
 
 def prepare_fm(chip):
     fm1, fm2, fm3, fm4, fm5, fm6 = _split_fm(chip)
+    if _has_csm(fm3):
+        raise CsmNotSupported()
+
     fm1 = list(map(_to_key_voice, fm1))
     fm2 = list(map(_to_key_voice, fm2))
-    fm3 = list(map(_to_key_voice_mode, fm3))
     fm4 = list(map(_to_key_voice, fm4))
     fm5 = list(map(_to_key_voice, fm5))
     fm6 = list(map(_to_key_voice_dac, fm6))
+
+    if _has_special_mode(fm3):
+        fm3 = list(_to_4key_voice_ch3(fm3))
+    else:
+        fm3 = list(map(_to_key_voice, fm3))
+
     return fm1, fm2, fm3, fm4, fm5, fm6
 
 def collect_fm_voices(*channels, voice_start):
     return _collect_voices(channels, voice_start)
 
+def is_fm3_special_mode(channel3):
+    return type(channel3[0]) is tuple and len(channel3[0]) == 4
+
+def split_fm3_special_mode(channel3):
+    splitted = ([], [], [], [])
+    for state in channel3:
+        for i in range(4):
+            splitted[i].append(state[i])
+    return splitted
+
 def to_patterns_fm(channel, voices):
     return _transform(channel, voices, 0)
-
-def to_patterns_fm3(channel, voices):
-    return _transform(channel, voices, 1)
 
 def to_patterns_fm6(channel, voices):
     return _transform(channel, voices, 2)
@@ -127,23 +142,17 @@ def _split_fm(fmtable):
             chs[i].append(fm.channels[i])
     return chs
 
+def _has_special_mode(fm3):
+    return any(cs.mode == 1 for cs in fm3)
+
+def _has_csm(fm3):
+    return any(cs.mode == 2 for cs in fm3)
+
 class Key(NamedTuple):
     note: int
     disp: int
     vol: int
     id: int
-    opmask: int
-    pan: int
-
-class Key3Op(NamedTuple):
-    note: int
-    disp: int
-    vol: int
-
-class Key3(NamedTuple):
-    op: tuple[Key3Op, Key3Op, Key3Op, Key3Op]
-    id: int
-    opmask: int
     pan: int
 
 def _to_key_voice(ch):
@@ -152,17 +161,57 @@ def _to_key_voice(ch):
         voice = _extract_voice(ch)
         voice, vol = _normalize_voice(voice)
         key = Key(note=note, disp=disp, vol=vol,
-            id=ch.keyid, opmask=ch.opmask, pan=ch.pan)
+            id=ch.keyid, pan=ch.pan)
     else:
         voice = None
-        key = Key(note=furnace.notes.Off, disp=0, vol=0, id=ch.keyid, opmask=0, pan=ch.pan)
+        key = Key(note=furnace.notes.Off, disp=0, vol=0, id=ch.keyid, pan=ch.pan)
     return key, voice
 
-class Ch3SpNotSupported(Vgm2FurError):
-    def __init__(self):
-        super().__init__()
-    def __str__(self):
-        return f'YM2612 FM3 special mode is not supported'
+def _to_4key_voice_ch3(chs):
+    opmask_prev = [0, 0, 0, 0]
+    keyid_prev = [0, 0, 0, 0]
+    for ch in chs:
+        keys = [None] * 4
+        opmask = bitfield.make(ch.opmask)
+        if opmask.all == 0:
+            for i in range(4):
+                keys[i] = Key(note=furnace.notes.Off, disp=0, vol=0, id=ch.keyid, pan=ch.pan)
+            voice = None
+        elif ch.mode == 1:
+            for i in range(4):
+                if opmask[i]:
+                    op = ch.operators[i]
+                    note, disp = _find_best_note(op.freq, op.block)
+                    vol = 0x7F - op.tl
+                else:
+                    note = furnace.notes.Off
+                    disp = 0
+                    vol = 0
+                if opmask[i] != opmask_prev[i]:
+                    keyid = ch.keyid
+                else:
+                    keyid = keyid_prev[i]
+                keys[i] = Key(note=note, disp=disp, vol=vol, id=keyid, pan=ch.pan)
+                opmask_prev[i] = opmask[i]
+                keyid_prev[i] = keyid
+            voice = _normalize_voice_ch3(_extract_voice(ch))
+        else:
+            keyid = ch.keyid
+            note, disp = _find_best_note(ch.freq, ch.block)
+            for i in range(4):
+                if opmask[i]:
+                    note_o = note
+                    disp_o = disp
+                    vol = 0x7F - ch.operators[i].tl
+                else:
+                    note_o = furnace.notes.Off
+                    disp_o = 0
+                    vol = 0
+                keys[i] = Key(note=note_o, disp=disp_o, vol=vol, id=keyid, pan=ch.pan)
+                opmask_prev[i] = opmask[i]
+                keyid_prev[i] = keyid
+            voice = _normalize_voice_ch3(_extract_voice(ch))
+        yield tuple(keys), voice
 
 class CsmNotSupported(Vgm2FurError):
     def __init__(self):
@@ -170,14 +219,6 @@ class CsmNotSupported(Vgm2FurError):
     def __str__(self):
         return f'YM2612 CSM is not supported'
 
-def _to_key_voice_mode(ch3):
-    if ch3.mode == 0:
-        key, voice = _to_key_voice(ch3)
-        return key, voice, 0
-    elif ch3.mode == 1:
-        raise Ch3SpNotSupported()
-    else:
-        raise CsmNotSupported()
     # note = [0] * 4
     # disp = [0] * 4
     # for i in range(4):
@@ -204,7 +245,7 @@ def _extract_voice(ch):
     op3 = ch.op(3)
     op4 = ch.op(4)
     return furnace.instr.FMVoice(
-        alg=ch.alg, fb=ch.fb, pms=ch.pms, ams=ch.ams, op=(
+        ch3=False, alg=ch.alg, fb=ch.fb, pms=ch.pms, ams=ch.ams, op=(
             furnace.instr.FMOp(mult=op1.mult, dt=op1.dt, tl=op1.tl, ar=op1.ar,
                 rs=op1.rs, dr=op1.dr, am=op1.am, sr=op1.sr, rr=op1.rr, sl=op1.sl,
                 ssg=op1.ssg, ssg_en=op1.ssg_en),
@@ -252,10 +293,8 @@ def _normalize_voice(voice):
                 voice.op[3]._replace(tl=tl[3])))
     return voice, 0x7F - vol
 
-def _normalize_voice3(voice):
-    vol = (voice.op[0].tl, voice.op[1].tl, voice.op[2], voice.op[3].tl)
-    vol = min(tl)
-    voice = voice._replace(op=(
+def _normalize_voice_ch3(voice):    
+    return voice._replace(ch3=True, op=(
         voice.op[0]._replace(tl=0),
         voice.op[1]._replace(tl=0),
         voice.op[2]._replace(tl=0),
@@ -266,7 +305,7 @@ def _collect_voices(chlist, init=0):
     index = init
     for i, ch in enumerate(chlist):
         for state in ch:
-            if i == 2 or i == 5:
+            if i == 5:
                 (_, voice, _) = state
             else:
                 (_, voice) = state
@@ -318,7 +357,7 @@ def _transform(ch, voices, type):
         if silent:
             note = furnace.notes.Off
         else:
-            note, disp, vol, keyid, _, pan = key
+            note, disp, vol, keyid, pan = key
         fx = []
 
         if note == furnace.notes.Off:
