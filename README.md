@@ -9,7 +9,7 @@ A Python CLI application that allows to convert VGM files to Furnace modules.
 
 **Installation steps**:
 - Download wheel file from the latest release;
-- Install the wheel file with ``pip`` or ``pipx``.
+- Install the wheel file with `pip` or `pipx`.
 
 Wheel file is installed by running a command in OS shell:
 ```
@@ -20,7 +20,7 @@ or
 pipx install <path-to-wheel-file>
 ```
 
-After installation you'll be able to call ``vgm2fur`` from your OS shell.
+After installation you'll be able to call `vgm2fur` from your OS shell.
 
 To uninstall, run a command:
 ```
@@ -34,18 +34,19 @@ depending on which was used to install.
 
 ## Usage
 
-Suppose you have a VGM file ``input.vgm`` and you want to convert it to ``output.fur`` file.
+Suppose you have a VGM file `input.vgm` and you want to convert it to `output.fur` file.
 Said conversion is performed by running a command:
 ```
-vgm2fur -c input.vgm -o output.fur
+vgm2fur input.vgm -o output.fur
 ```
-or 
-```
-vgm2fur input.vgm -co output.fur
-```
-(vgm2fur follows [GNU Program Argument Syntax Conventions](https://www.gnu.org/software/libc/manual/html_node/Argument-Syntax.html).)
 
-Input VGM file can be either compressed or uncompressed.
+Alternatively, command
+```
+vgm2fur file.vgm
+```
+will convert `file.vgm` to `file.fur`.
+
+Input VGM file can be either compressed (`.vgz`) or uncompressed (`.vgm`).
 
 You can append to the command one or more following options. `iii` means integer value, `fff` means floating point value.
 - `--pattern-length=iii` - sets Furnace pattern length, in rows (default is 128).
@@ -58,5 +59,4 @@ You can append to the command one or more following options. `iii` means integer
 
 At the moment only SEGA Genesis (YM2612 + SN76489) VGM modules are supported, with following limitations:
 - DAC/PCM is not supported, program will ignore it
-- FM3 special mode is not supported, program will exit with an error
 - CSM is not supported, program will exit with an error
