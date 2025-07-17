@@ -162,13 +162,13 @@ def _transform_noise(psglist):
             note = furnace.notes.Off
             disp = 0
         elif spec == 0:
-            note = furnace.notes.A2
+            note = furnace.notes.C0
             disp = 0
         elif spec == 1:
-            note = furnace.notes.A3
+            note = furnace.notes.Cs0
             disp = 0
         elif spec == 2:
-            note = furnace.notes.A4
+            note = furnace.notes.D0
             disp = 0
 
         if fmode != fmode_c: fx.append(furnace.effects.noise_mode(fmode))
