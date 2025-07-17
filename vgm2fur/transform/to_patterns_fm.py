@@ -98,10 +98,11 @@ FmFreq = FmFreqClass()
 
 def _find_best_note(freq, block):
     if freq < FmFreq.freq_min:
-        if block > 0:
+        while freq < FmFreq.freq_min and block > 0:
             freq *= 2
             block -= 1
-        else:
+        
+        if freq < FmFreq.freq_min:
             return _find_best_note_bisect(freq, FmFreq.underfreq_map)
     elif freq > FmFreq.freq_max:
         if block < 7:
