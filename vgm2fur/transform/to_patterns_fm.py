@@ -176,8 +176,11 @@ def _to_4key_voice_ch3(chs):
         keys = [None] * 4
         opmask = bitfield.make(ch.opmask)
         if opmask.all == 0:
+            keyid = ch.keyid
             for i in range(4):
-                keys[i] = Key(note=furnace.notes.Off, disp=0, vol=0, id=ch.keyid, pan=ch.pan)
+                keys[i] = Key(note=furnace.notes.Off, disp=0, vol=0, id=keyid, pan=ch.pan)
+                opmask_prev[i] = 0
+                keyid_prev[i] = keyid
             voice = None
         elif ch.mode == 1:
             for i in range(4):
