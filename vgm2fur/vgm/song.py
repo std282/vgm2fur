@@ -130,9 +130,9 @@ def events_csv(events):
                         i = d[2:0] % 4 + 3 * (d[2:0] // 4)
                         opmask = d[7:4]
                         if opmask == 0:
-                            descr = f'FM{i+1} key off'
+                            descr = f'YM2612 FM{i+1} key off'
                         else:
-                            descr = f'FM{i+1} key on ({opmask:X})'
+                            descr = f'YM2612 FM{i+1} key on ({opmask:X})'
                     case (0, 0x2B):
                         res = 'En' if d[7] else 'Dis'
                         descr = f'YM2612 DAC {res}'
@@ -171,7 +171,7 @@ def events_csv(events):
                 d = bitfield.make(event[1])
                 if d[7]:
                     if d[4]:
-                        ch = f'PSG{1+d[6:5]}' if d[6:5] != 3 else 'PSG Noise'
+                        ch = f'PSG{1+d[6:5]} ' if d[6:5] != 3 else 'PSG Noise '
                         descr = 'SN76489 ' + ch + f'Vol={d[3:0]}'
                     elif d[6:5] != 3:
                         chno = 1+d[6:5]

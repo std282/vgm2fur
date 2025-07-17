@@ -8,7 +8,7 @@ def prepare_fm(chip):
     if _has_csm(fm3):
         raise CsmNotSupported()
 
-    fm1 = list(map(_to_key_voice, fm1))
+    fm1 = list(map(_to_key_voice_lfo, fm1))
     fm2 = list(map(_to_key_voice, fm2))
     fm4 = list(map(_to_key_voice, fm4))
     fm5 = list(map(_to_key_voice, fm5))
@@ -38,6 +38,9 @@ def split_fm3_special_mode(channel3):
 
 def to_patterns_fm(channel, voices):
     return _transform(channel, voices, 0)
+
+def to_patterns_fm1(channel, voices):
+    return _transform(channel, voices, 1)
 
 def to_patterns_fm6(channel, voices):
     return _transform(channel, voices, 2)
@@ -225,25 +228,14 @@ class CsmNotSupported(Vgm2FurError):
     def __str__(self):
         return f'YM2612 CSM is not supported'
 
-    # note = [0] * 4
-    # disp = [0] * 4
-    # for i in range(4):
-    #     note[i], disp[i] = _find_best_note(
-    #         ch3.operators[i].freq, ch3.operators[i].block)
-    # voice = _extract_voice(ch3)
-    # voice, vol = _normalize_voice3(voice)
-    # key = Key3(
-    #     op=(
-    #         KeyBase(note=note[0], disp=disp[0], vol=vol[0]),
-    #         KeyBase(note=note[1], disp=disp[1], vol=vol[1]),
-    #         KeyBase(note=note[2], disp=disp[2], vol=vol[2]),
-    #         KeyBase(note=note[3], disp=disp[3], vol=vol[3])),
-    #     id=ch.keyid, opmask=ch.opmask, pan=ch.pan)
-    # return key, voice, 1
-
 def _to_key_voice_dac(ch6):
     key, voice = _to_key_voice(ch6)
     return key, voice, ch6.dac_en
+
+def _to_key_voice_lfo(ch1):
+    key, voice = _to_key_voice(ch1)
+    lfo = ch1.lfo if ch1.lfo_en else None
+    return key, voice, lfo
 
 def _extract_voice(ch):
     op1 = ch.op(1)
@@ -311,7 +303,7 @@ def _collect_voices(chlist, init=0):
     index = init
     for i, ch in enumerate(chlist):
         for state in ch:
-            if i == 5:
+            if i == 0 or i == 5:
                 (_, voice, _) = state
             else:
                 (_, voice) = state
@@ -341,6 +333,12 @@ def _fx_legato(on):
     else:
         return furnace.effects.legato(0x00)
 
+def _fx_lfo(value):
+    if value is None:
+        return furnace.effects.lfo(0x00)
+    else:
+        return furnace.effects.lfo(0x10 + value)
+
 def _transform(ch, voices, type):
     note_c = furnace.notes.Off
     disp_c = 0
@@ -348,12 +346,14 @@ def _transform(ch, voices, type):
     keyid_c = -1
     ins_c = -1
     pan_c = 0
+    lfo_c = None
     legato = False
     for state in ch:
+        lfo = lfo_c
         match type:
             case 1:
-                key, voice, mode = state
-                silent = (mode != 0)
+                key, voice, lfo = state
+                silent = False
             case 2:
                 key, voice, dac = state
                 silent = (dac != 0)
@@ -365,6 +365,10 @@ def _transform(ch, voices, type):
         else:
             note, disp, vol, keyid, pan = key
         fx = []
+
+        if lfo != lfo_c:
+            fx.append(_fx_lfo(lfo))
+            lfo_c = lfo
 
         if note == furnace.notes.Off:
             if legato: fx.append(_fx_legato(0))

@@ -19,10 +19,8 @@ class IllFormedEvent(Exception):
 
 class YM2612:
     def __init__(self):
-        self.lfo = 0
-        self.lfo_en = 0
-        self.channels = [Channel(), Channel(), Channel3(),
-                         Channel(), Channel(), Channel6()]
+        self.channels = [Channel1(), Channel(), Channel3(),
+                         Channel(),  Channel(), Channel6()]
         self.regs = bytearray(0xC0 * 2)
 
     def ch(self, num):
@@ -56,8 +54,6 @@ class YM2612:
         return self.channels[2].operators[op]
 
     def __eq__(self, other):
-        # return (self._tuple() == other._tuple() and
-        #     all(a == b for (a, b) in zip(self.channels, other.channels)))
         return (
             bytes(self.regs) == bytes(other.regs) and 
             all(a.keyid == b.keyid for (a, b) in zip(self.channels, other.channels)))
@@ -68,8 +64,8 @@ class YM2612:
         try:
             match (port, addr):
                 case (0, 0x22):
-                    self.lfo = data[2:0]
-                    self.lfo_en = data[3]
+                    self.ch(1).lfo = data[2:0]
+                    self.ch(1).lfo_en = data[3]
                 case (0, 0x27):
                     self.ch(3).mode = data[7:6]
                 case (0, 0x28):
@@ -189,6 +185,14 @@ class Channel:
         clone.operators = [op.clone() for op in clone.operators]
         return clone
 
+class Channel1(Channel):
+    def __init__(self):
+        self._make_most_fields()
+        self.operators = [Operator(), Operator(), Operator(), Operator()]
+        self.lfo = 0
+        self.lfo_en = 0
+
+    _fields = Channel._fields + ['lfo', 'lfo_en']
 
 class Channel3(Channel):
     def __init__(self):
@@ -374,7 +378,7 @@ def _csv_chip(ym, ymft, chft, opft):
     ss = []
     for ft in ymft:
         match ft:
-            case 'lfo': s = f'{ym.lfo_en},{ym.lfo}'
+            case 'lfo': s = f'{ym.ch(1).lfo_en},{ym.ch(1).lfo}'
             case 'dac': s = f'{ym.ch(6).dac_en}'
             case 'freq3sp':
                 ch3 = ym.ch(3)

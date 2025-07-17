@@ -368,7 +368,7 @@ def convert(params):
         voice_start=fur.instrument_count)
     for i, (voice, _) in enumerate(sorted(voices.items(), key=lambda x: x[1])):
         fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
-    fur.add_patterns(transform.to_patterns_fm(fm1, voices), 'fm1')
+    fur.add_patterns(transform.to_patterns_fm1(fm1, voices), 'fm1')
     fur.add_patterns(transform.to_patterns_fm(fm2, voices), 'fm2')
     if fur.fm3_special_mode:
         fm3o1, fm3o2, fm3o3, fm3o4 = transform.split_fm3_special_mode(fm3)
