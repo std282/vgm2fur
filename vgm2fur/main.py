@@ -87,7 +87,7 @@ def _main():
             case '-z' | '--decompress':
                 action = Action.DECOMPRESS
                 params.target = io_target | {'decompress': None}
-                param.decompress = param
+                params.decompress = param
             case '--unsampled':
                 params.unsampled = Param(key, True)
             case '--print-vgm':
