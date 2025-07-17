@@ -359,11 +359,9 @@ def _transform(ch, voices, type):
             legato = True
         else:
             if disp != disp_c: fx.append(_fx_pitch(disp - disp_c))
-            if legato: fx.append(_fx_legato(0))
             if pan != pan_c: fx.append(_fx_pan(pan))
             vol_o = vol if vol != vol_c else None
             yield furnace.Entry(vol=vol_o, fx=fx)
             disp_c = disp
             vol_c = vol
             pan_c = pan
-            legato = False
