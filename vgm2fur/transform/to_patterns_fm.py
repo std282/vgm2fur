@@ -25,13 +25,15 @@ def collect_fm_voices(*channels, voice_start):
     return _collect_voices(channels, voice_start)
 
 def is_fm3_special_mode(channel3):
-    return type(channel3[0]) is tuple and len(channel3[0]) == 4
+    return (type(channel3[0]) is tuple 
+        and type(channel3[0][0]) is tuple
+        and len(channel3[0][0]) == 4)
 
 def split_fm3_special_mode(channel3):
     splitted = ([], [], [], [])
-    for state in channel3:
+    for state, voice in channel3:
         for i in range(4):
-            splitted[i].append(state[i])
+            splitted[i].append((state[i], voice))
     return splitted
 
 def to_patterns_fm(channel, voices):

@@ -184,7 +184,7 @@ class Module:
         if len(self.pattern_matrix) != self.channel_count:
             self.pattern_matrix = (self.pattern_matrix[:2] 
                 + [[] for _ in range(3)] + self.pattern_matrix[2:])
-        if len(self.effects_count != self.effects_count):
+        if len(self.effects_count) != self.channel_count:
             self.effects_count = (self.effects_count[:2]
                 + [1, 1, 1] + self.effects_count[2:])
 
