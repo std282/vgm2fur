@@ -354,22 +354,24 @@ def convert(params):
     fur.pattern_length = params.pattern_length
 
     psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
+    fm1, fm2, fm3, fm4, fm5, fm6 = transform.prepare_fm(fm_chip)
+    if transform.is_fm3_special_mode(fm3):
+        fur.fm3_special_mode = True
+
     fur.add_instrument(furnace.instr.psg_blank('PSG_BLANK'))
     fur.add_patterns(psg1, 'psg1')
     fur.add_patterns(psg2, 'psg2')
     fur.add_patterns(psg3, 'psg3')
     fur.add_patterns(noise, 'noise')
 
-    fm1, fm2, fm3, fm4, fm5, fm6 = transform.prepare_fm(fm_chip)
     voices = transform.collect_fm_voices(fm1, fm2, fm3, fm4, fm5, fm6,
         voice_start=fur.instrument_count)
     for i, (voice, _) in enumerate(sorted(voices.items(), key=lambda x: x[1])):
         fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
     fur.add_patterns(transform.to_patterns_fm(fm1, voices), 'fm1')
     fur.add_patterns(transform.to_patterns_fm(fm2, voices), 'fm2')
-    if transform.is_fm3_special_mode(fm3):
+    if fur.fm3_special_mode:
         fm3o1, fm3o2, fm3o3, fm3o4 = transform.split_fm3_special_mode(fm3)
-        fur.fm3_special_mode = True
         fur.add_patterns(transform.to_patterns_fm(fm3o1, voices), 'fm3o1')
         fur.add_patterns(transform.to_patterns_fm(fm3o2, voices), 'fm3o2')
         fur.add_patterns(transform.to_patterns_fm(fm3o3, voices), 'fm3o3')
