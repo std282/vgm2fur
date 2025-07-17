@@ -440,18 +440,18 @@ def decompress(params):
     with _open_read(params.infile) as f:
         data_in = f.read()
 
-    print("Decompressing... ")
+    eprint("Decompressing... ")
     for method in ['gzip', 'zlib']:
         data_out = _try_decompress(data_in, method)
         if data_out is not None:
-            print(f'Decompressed using {method} method.')
+            eprint(f'Decompressed using {method} method.')
             break
     else:
         raise InvalidCompressedFileFormat(params.infile)
 
     with _open_write(params.outfile) as f:
         f.write(data_out)
-    print('Done.')
+    eprint('Done.')
 
 def print_usage():
     usage = '''usage:
