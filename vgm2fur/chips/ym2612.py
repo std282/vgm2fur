@@ -76,9 +76,11 @@ class YM2612:
                     subch = data[1:0]
                     if subch == 3:
                         raise IllFormedEvent((0x52, 0x28, data.all))
-                    i = subch + 3 * data[2]
-                    self.channels[i].opmask = data[7:4]
-                    self.channels[i].keyid += 1
+                    ch = self.channels[subch + 3 * data[2]]
+                    opmask = data[7:4]
+                    if ch.opmask != opmask:
+                        ch.opmask = opmask
+                        ch.keyid += 1
                 case (0, 0x2B):
                     self.ch(6).dac_en = data[7]
                 case (p, a) if (a & 0xF0) == 0x30:
