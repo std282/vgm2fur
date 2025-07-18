@@ -269,6 +269,14 @@ class InvalidParameter(AppError):
     def __str__(self):
         return f'parameter "{self.param[0]}" has invalid value: "{self.param[1]}"'
 
+class SongTooLong(AppError):
+    def __init__(self, songlen, maxlen):
+        super().__init__(songlen, maxlen)
+        self.songlen = songlen
+        self.maxlen = maxlen
+    def __str__(self):
+        return f'VGM file is too long; try increasing pattern length or row duration'
+
 def _parse_param(param, parse):
     try:
         if type(param[1]) is str:
@@ -344,18 +352,26 @@ def convert(params):
             row_duration = x
             playback_rate = y
 
+    total_wait = song.total_wait
+    skip_samples = params.skip_samples
+    pattern_length = params.pattern_length
+    songlen = total_wait - skip_samples
+    maxlen = int(row_duration * pattern_length * 256)
+    if songlen > maxlen:
+        raise SongTooLong(songlen, maxlen)
+
     eprint('Constructing state table...')
     chips.ym2612.FreqLatch.use = params.use_latch
     fm_chip, psg_chip = transform.tabulate(song.events,
-        length=song.total_wait,
+        length=total_wait,
         period=row_duration,
         chips=['ym2612', 'sn76489'],
-        skip=params.skip_samples)
+        skip=skip_samples)
 
     eprint('Translating state table to tracker events...')
     fur = furnace.Module()
     fur.ticks_per_second = playback_rate
-    fur.pattern_length = params.pattern_length
+    fur.pattern_length = pattern_length
 
     psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
     fm1, fm2, fm3, fm4, fm5, fm6 = transform.prepare_fm(fm_chip)
