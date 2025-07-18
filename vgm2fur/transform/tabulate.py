@@ -15,12 +15,12 @@ def _tabulate(events):
     for action in _events_to_actions(events):
         match action:
             case FmWrite(port, addr, data):
-                fm = fm.updated(port, addr, data)
+                fm.update(port, addr, data)
             case PsgWrite(data):
-                psg = psg.updated(data)
+                psg.update(data)
             case Wait(delta_t):
                 if len(table) == 0 or table[-1].fm != fm or table[-1].psg != psg:
-                    table.append(TableState(t, fm, psg))
+                    table.append(TableState(t, fm.copy(), psg.copy()))
                 t += delta_t
             case PlaySample():
                 dac.ptr += 1

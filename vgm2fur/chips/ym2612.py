@@ -2,6 +2,7 @@ from vgm2fur import bitfield
 import copy
 import warnings
 
+
 class FreqLatch:
     use = False
     def __init__(self):
@@ -24,6 +25,7 @@ class FreqLatch:
         self.state = FreqLatch._high_table[self.state]
         return (self.freq.all, self.block) if self.state == 0 else None
 
+
 class IllFormedEvent(Exception):
     def __init__(self, eventdata):
         super().__init__(eventdata)
@@ -39,10 +41,11 @@ class IllFormedEvent(Exception):
                 elems.append(f'{x:02X}')
         return ' '.join(elems)
 
+
 class YM2612:
-    def __init__(self):
-        self.channels = [Channel1(), Channel(), Channel3(),
-                         Channel(),  Channel(), Channel6()]
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        self.channels = [Channel1(), Channel(), Channel3(), Channel(), Channel(), Channel6()]
         self.regs = bytearray(0xC0 * 2)
 
     def ch(self, num):
@@ -162,27 +165,16 @@ class YM2612:
         except IllFormedEvent as err:
             warnings.warn(str(err))
 
-    def updated(self, port, addr, data):
-        clone = self.clone()
-        clone.update(port, addr, data)
+    def copy(self):
+        clone = YM2612(noinit=True)
+        clone.channels = [ch.copy() for ch in self.channels]
+        clone.regs = self.regs.copy()
         return clone
 
-    def clone(self):
-        clone = copy.copy(self)
-        clone.channels = [ch.clone() for ch in self.channels]
-        clone.regs = clone.regs.copy()
-        return clone
 
-class Channel:
-    def __init__(self):
-        self._make_most_fields()
-        self.operators = [Operator(), Operator(), Operator(), Operator()]
-
-    def op(self, num):
-        return self.operators[num - 1]
-
-    def _make_most_fields(self):
-        self.latch = FreqLatch()
+class ChannelBase:
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
         self.keyid = 0
         self.opmask = 0
         self.freq = 0
@@ -193,59 +185,89 @@ class Channel:
         self.ams = 0
         self.pan = 0
 
-    _fields = 'keyid opmask freq block alg fb pms ams pan'.split(' ')
-    def _tuple(self):
-        return tuple(getattr(self, x) for x in type(self)._fields)
-
-    def __eq__(self, other):
-        return (self._tuple() == other._tuple() and
-            all(a == b for (a, b) in zip(self.operators, other.operators)))
-
-    def clone(self):
-        clone = copy.copy(self)
-        clone.operators = [op.clone() for op in clone.operators]
+    def copy(self):
+        clone = type(self)(noinit=True)
+        clone.keyid = self.keyid
+        clone.opmask = self.opmask
+        clone.freq = self.freq
+        clone.block = self.block
+        clone.alg = self.alg
+        clone.fb = self.fb
+        clone.pms = self.pms
+        clone.ams = self.ams
+        clone.pan = self.pan
         return clone
 
-class Channel1(Channel):
-    def __init__(self):
-        self._make_most_fields()
+
+class Channel(ChannelBase):
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
+        self.latch = FreqLatch()
         self.operators = [Operator(), Operator(), Operator(), Operator()]
+
+    def op(self, num):
+        return self.operators[num - 1]
+
+    def copy(self):
+        clone = super().copy()
+        clone.latch = self.latch
+        clone.operators = [op.copy() for op in self.operators]
+        return clone
+
+
+class Channel1(Channel):
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
         self.lfo = 0
         self.lfo_en = 0
 
-    _fields = Channel._fields + ['lfo', 'lfo_en']
+    def copy(self):
+        clone = super().copy()
+        clone.lfo = self.lfo
+        clone.lfo_en = self.lfo_en
+        return clone
 
-class Channel3(Channel):
-    def __init__(self):
-        self._make_most_fields()
+
+class Channel3(ChannelBase):
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
         self.mode = 0
+        self.latch = FreqLatch()
         self.operators = [Operator3(), Operator3(), Operator3(), Operator3_4(self)]
 
-    _fields = Channel._fields + ['mode']
+    op = Channel.op
 
-    def clone(self):
-        clone = copy.copy(self)
+    def copy(self):
+        clone = super().copy()
+        clone.mode = self.mode
+        clone.latch = self.latch
         clone.operators = [
-            clone.operators[0].clone(),
-            clone.operators[1].clone(),
-            clone.operators[2].clone(),
-            clone.operators[3].clone(clone),
+            self.operators[0].copy(),
+            self.operators[1].copy(),
+            self.operators[2].copy(),
+            self.operators[3].copy(clone),
         ]
         return clone
 
+
 class Channel6(Channel):
-    def __init__(self):
-        self._make_most_fields()
-        self.operators = [Operator(), Operator(), Operator(), Operator()]
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
         self.dac_en = 0
 
-    _fields = Channel._fields + ['dac_en']
+    def copy(self):
+        clone = super().copy()
+        clone.dac_en = self.dac_en
+        return clone
+
 
 class Operator:
-    def __init__(self):
-        self._make_most_fields()
-
-    def _make_most_fields(self):
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
         self.mult = 0
         self.dt = 0
         self.tl = 0
@@ -259,33 +281,43 @@ class Operator:
         self.ssg = 0
         self.ssg_en = 0
 
-    _fields = 'mult dt tl ar rs dr am sr rr sl ssg ssg_en'.split()
-    def _tuple(self):
-        return tuple(getattr(self, x) for x in self._fields)
-
-    def __eq__(self, other):
-        return self._tuple() == other._tuple()
-
-    def clone(self):
-        return copy.copy(self)
+    def copy(self):
+        clone = type(self)(noinit=True)
+        clone.mult = self.mult
+        clone.dt = self.dt
+        clone.tl = self.tl
+        clone.ar = self.ar
+        clone.rs = self.rs
+        clone.dr = self.dr
+        clone.am = self.am
+        clone.sr = self.sr
+        clone.rr = self.rr
+        clone.sl = self.sl
+        clone.ssg = self.ssg
+        clone.ssg_en = self.ssg_en
+        return clone
 
 
 class Operator3(Operator):
-    def __init__(self):
-        self._make_most_fields()
+    def __init__(self, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
         self.freq = 0
         self.block = 0
         self.latch = FreqLatch()
 
-    _fields = Operator._fields + 'freq block'.split()
-
-    def clone(self):
-        return copy.copy(self)
+    def copy(self):
+        clone = super().copy()
+        clone.freq = self.freq
+        clone.block = self.block
+        clone.latch = self.latch
+        return clone
 
 
 class Operator3_4(Operator):
-    def __init__(self, owner):
-        self._make_most_fields()
+    def __init__(self, owner=None, /, *, noinit=False):
+        if noinit: return
+        super().__init__()
         self._owner = owner
 
     @property
@@ -293,8 +325,8 @@ class Operator3_4(Operator):
     @property
     def block(self): return self._owner.block
 
-    def clone(self, owner):
-        clone = copy.copy(self)
+    def copy(self, owner):
+        clone = super().copy()
         clone._owner = owner
         return clone
 

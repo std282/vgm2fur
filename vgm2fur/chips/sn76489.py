@@ -1,15 +1,32 @@
 from vgm2fur import bitfield
 import copy
 
+
 class TonalChannel:
-    def __init__(self):
+    def __init__(self, noinit=False):
+        if noinit: return
         self.freq = 0
         self.vol = 15
 
+    def copy(self):
+        clone = TonalChannel(noinit=True)
+        clone.freq = self.freq
+        clone.vol = self.vol
+        return clone
+
+
 class NoiseChannel:
-    def __init__(self):
+    def __init__(self, noinit=False):
+        if noinit: return
         self.mode = 0
         self.vol = 15
+
+    def copy(self):
+        clone = NoiseChannel(noinit=True)
+        clone.mode = self.mode
+        clone.vol = self.vol
+        return clone
+
 
 class EventBF(bitfield.Bitfield):
     is_action = bitfield.named[7]
@@ -18,52 +35,52 @@ class EventBF(bitfield.Bitfield):
     payload_l = bitfield.named[3:0]
     payload_h = bitfield.named[5:0]
 
+
 class SN76489:
     def __init__(self, /, noinit=False):
-        if noinit:
-            self.tonal = None
-            self.noise = None
-            self.lastch = None
-        else:
-            self.tonal = [TonalChannel() for _ in range(3)]
-            self.noise = NoiseChannel()
-            self.lastch = 0
+        if noinit: return
+        self.tonal = [TonalChannel() for _ in range(3)]
+        self.noise = NoiseChannel()
+        self._lastch = None
+        self._freq = None
 
-    def _fields_tuple(self):
-        return (self.tonal[0].freq, self.tonal[0].vol,
-                self.tonal[1].freq, self.tonal[1].vol,
-                self.tonal[2].freq, self.tonal[2].vol,
-                self.noise.mode, self.noise.vol, self.lastch)
+    def _tuple(self):
+        return (self.tonal[0].freq,
+            self.tonal[0].vol,
+            self.tonal[1].freq,
+            self.tonal[1].vol,
+            self.tonal[2].freq,
+            self.tonal[2].vol,
+            self.noise.mode,
+            self.noise.vol)
 
     def __eq__(self, other):
-        return self._fields_tuple() == other._fields_tuple()
+        return self._tuple() == other._tuple()
 
-    def __hash__(self):
-        return hash(self._fields_tuple())
-
-    def _channel(self, chan_no):
+    def ch(self, chan_no):
         match chan_no:
             case 0 | 1 | 2: return self.tonal[chan_no]
             case 3: return self.noise
-            case _: return None
 
     def update(self, data):
         data = EventBF(data)
         if data.is_action:
             if data.is_volume:
-                self._channel(data.channel).vol = data.payload_l
+                self.ch(data.channel).vol = data.payload_l
             elif data.channel != 3:
-                self.tonal[data.channel].freq = data.payload_l
-                self.lastch = data.channel
+                self._freq = data.payload_l
+                self._lastch = data.channel
             else:
                 self.noise.mode = data.payload_l
         else:
-            self.tonal[self.lastch].freq |= data.payload_h << 4
+            self.tonal[self._lastch].freq = self._freq | (data.payload_h << 4)
 
-    def updated(self, data):
-        clone = copy.deepcopy(self)
-        clone.update(data)
+    def copy(self):
+        clone = SN76489(noinit=True)
+        clone.tonal = [ch.copy() for ch in self.tonal]
+        clone.noise = self.noise.copy()
         return clone
+
 
 def csv(chip_states, src_features):
     snft = []
