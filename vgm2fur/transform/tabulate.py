@@ -1,14 +1,18 @@
 from vgm2fur import chips
-from collections import namedtuple
+from typing import NamedTuple
 
-TableState = namedtuple('TableState', 't, fm, psg')
+class TableState(NamedTuple):
+    t: int
+    fm: chips.YM2612
+    psg: chips.SN76489
 
 def _tabulate(events):
     fm = chips.YM2612()
     psg = chips.SN76489()
+    dac = chips.Sampler()
     t = 0
     table = []
-    for action in map(_event_to_action, events):
+    for action in _events_to_actions(events):
         match action:
             case FmWrite(port, addr, data):
                 fm = fm.updated(port, addr, data)
@@ -18,6 +22,11 @@ def _tabulate(events):
                 if len(table) == 0 or table[-1].fm != fm or table[-1].psg != psg:
                     table.append(TableState(t, fm, psg))
                 t += delta_t
+            case PlaySample():
+                dac.ptr += 1
+            case SetSamplePointer(ptr):
+                dac.ptr = ptr
+                dac.keyid += 1
     return table
 
 def _decimate(table, t_end, period, start):
@@ -76,29 +85,44 @@ class Wait:
     def __init__(self, wait):
         self.wait = wait
 
+class PlaySample:
+    pass
+
+class SetSamplePointer:
+    __match_args__ = ('ptr', )
+    def __init__(self, ptr):
+        self.ptr = ptr
+
 class Unknown:
+    __match_args__ = ('event', )
     def __init__(self, event):
         self.event = event
 
-def _event_to_action(event):
-    match event:
-        case (0x52, addr, data):
-            return FmWrite(0, addr, data)
-        case (0x53, addr, data):
-            return FmWrite(1, addr, data)
-        case (0x50, data):
-            return PsgWrite(data)
-        case (0x61, wait_l, wait_h):
-            wait = wait_l + wait_h * 256
-            return Wait(wait)
-        case (0x62, ):
-            return Wait(735)
-        case (0x63, ):
-            return Wait(882)
-        case _:
-            if 0x70 <= event[0] and event[0] <= 0x7F:
-                return Wait(event[0] - 0x70 + 1)
-            elif 0x81 <= event[0] and event[0] <= 0x8F:
-                return Wait(event[0] - 0x80)
-            else:
-                return Unknown(event)
+def _events_to_actions(events):
+    for event in events:
+        match event:
+            case (0x52, addr, data):
+                yield FmWrite(0, addr, data)
+            case (0x53, addr, data):
+                yield FmWrite(1, addr, data)
+            case (0x50, data):
+                yield PsgWrite(data)
+            case (0x61, wait_l, wait_h):
+                wait = wait_l + wait_h * 256
+                yield Wait(wait)
+            case (0x62, ):
+                yield Wait(735)
+            case (0x63, ):
+                yield Wait(882)
+            case _ if 0x70 <= event[0] and event[0] <= 0x7F:
+                yield Wait(event[0] - 0x70 + 1)
+            case 0x80:
+                yield PlaySample()
+            case _ if 0x81 <= event[0] and event[0] <= 0x8F:
+                yield PlaySample()
+                yield Wait(event[0] - 0x80)
+            case (0xE0, a0, a1, a2, a3):
+                addr = a0 + (a1 << 8) + (a2 << 16) + (a3 << 24)
+                yield SetSamplePointer(addr)
+            case _:
+                yield Unknown(event)
