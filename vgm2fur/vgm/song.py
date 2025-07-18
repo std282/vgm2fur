@@ -33,6 +33,10 @@ class Song:
                     comset |= {0x52, 0x53}
                 case 'sn76489':
                     comset |= {0x50}
+                case 'data':
+                    comset |= {0x67}
+                case 'dac':
+                    comset |= {*range(0x90, 0x96), 0xE0}
         _seek_vgm_data_start(unp)
         for com in _events(unp):
             if com[0] in comset:
@@ -108,10 +112,21 @@ def _events(unp):
     except unpacker.NoDataError:
         pass
 
+def _event_67_bytes(type, data):
+    yield from [0x67, 0x66]
+    yield type
+    yield from len(data).to_bytes(4, 'little')
+
 def events_csv(events):
     t = 0
     yield 'Sample,Description,Raw data'
     for event in events:
+        if event[0] == 0x67:
+            (_, type, data) = event
+            descr = f'DATA type={type} len={len(data)}'
+            rawdata = ' '.join(f'{x:02X}' for x in _event_67_bytes(type, data)) + ' ...'
+            yield f'{t},{descr},{rawdata}'
+            continue
         rawdata = ' '.join(f'{x:02X}' for x in event)
         wait = 0
         match event[0]:
@@ -197,9 +212,60 @@ def events_csv(events):
             case _ if (event[0] & 0xF0) == 0x80:
                 wait = event[0] & 0x0F
                 if wait == 0:
-                    descr = 'Play sample'
+                    descr = 'YM2612 DAC play sample'
                 else:
-                    descr = f'Play sample and wait {wait} samples'
+                    descr = f'YM2612 DAC play sample and wait {wait} samples'
+            case 0x68:
+                chip = event[2]
+                readoff = event[3] + (event[4] << 8) + (event[5] << 16)
+                writeoff = event[6] + (event[7] << 8) + (event[8] << 16)
+                size = event[9] + (event[10] << 8) + (event[11] << 16)
+                descr = f'DAC PCM RAM operation: chip={chip} size={size} read={readoff} write={writeoff}'
+            case 0x90:
+                descr = f'Generic DAC setup: ID={event[1]} chip={event[2]} port={event[3]} com={event[4]}'
+            case 0x91:
+                descr = f'Generic DAC set stream data: ID={event[1]} bank={event[2]} step={event[3]} start={event[4]}'
+            case 0x92:
+                freq = event[2] + (event[3] << 8) + (event[4] << 16) + (event[5] << 24)
+                descr = f'Generic DAC set stream freq: ID={event[1]} freq={freq}'
+            case 0x93:
+                start = event[2] + (event[3] << 8) + (event[4] << 16) + (event[5] << 24)
+                length = event[7] + (event[8] << 8) + (event[9] << 16) + (event[10] << 24)
+                match event[6]:
+                    case 0x00 | 0x10 | 0x80 | 0x90: lensuffix = '(ignore)'
+                    case 0x01: lensuffix = 'cmd'
+                    case 0x02: lensuffix = 'ms'
+                    case 0x03: lensuffix = '(untilend)'
+                    case 0x11: lensuffix = 'cmd(reversed)'
+                    case 0x12: lensuffix = 'ms(reversed)'
+                    case 0x13: lensuffix = '(untilend+reversed)'
+                    case 0x81: lensuffix = 'cmd(loop)'
+                    case 0x82: lensuffix = 'ms(loop)'
+                    case 0x83: lensuffix = '(untilend+loop)'
+                    case 0x91: lensuffix = 'cmd(loop+reversed)'
+                    case 0x92: lensuffix = 'ms(loop+reversed)'
+                    case 0x93: lensuffix = '(untilend+loop+reversed)'
+                    case _: lensuffix = '??'
+                descr = f'Generic DAC start stream: ID={event[1]} start={start} len={length}{lensuffix}'
+            case 0x94:
+                descr = f'Generic DAC stop stream: ID={event[1]}'
+            case 0x95:
+                block = event[2] + (event[3] << 8)
+                match event[4]:
+                    case 0x00: flags = 'none'
+                    case 0x01: flags = 'loop'
+                    case 0x10: flags = 'reverse'
+                    case 0x11: flags = 'loop+reverse'
+                    case _: flags = '??'
+                descr = f'Generic DAC start stream: ID={event[1]} block={block} flags={flags}'
+            case 0xE0:
+                read = event[1] + (event[2] << 8) + (event[3] << 16) + (event[4] << 24)
+                descr = f'YM2612 DAC read={read}'
+            case 0x67:
+                type = event[2]
+                length = event[3] + (event[4] << 8) + (event[5] << 16) + (event[6] << 24)
+                descr = f'DATA type={type} len={length}'
+                del type
             case _:
                 descr = ''
         yield f'{t},{descr},{rawdata}'

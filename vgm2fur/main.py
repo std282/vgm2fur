@@ -35,7 +35,7 @@ def _main():
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:z',
             ['print-istate=', 'version', 'decompress', 'unsampled',
-            'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length=',
+            'print-vgm=', 'playback-rate=', 'row-duration=', 'pattern-length=',
             'skip-samples=', 'sn76489-volume=', 'ym2612-volume=', 'no-latch'])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
@@ -76,7 +76,10 @@ def _main():
                 params.unsampled = Param(key, True)
             case '--print-vgm':
                 action = Action.PRINT_VGM
-                params.target = io_target
+                params.target = io_target | {
+                    'vgm_features': 'VGM feature list'
+                }
+                params.vgm_features = param
                 params.outfile = DefaultValue(None)
             case '--pattern-length':
                 params.pattern_length = _parse_param(param, int)
@@ -504,8 +507,12 @@ def print_vgm(params):
     except OSError as err:
         raise FileOpenReadError(params.infile, err) from None
 
+    features = params.vgm_features.split(',')
+    if len(features) == 0:
+        raise MissingParameter('VGM feature list')
+
     eprint('Writing output...')
     with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
-        for csv in vgm.events_csv(song.events('ym2612', 'sn76489')):
+        for csv in vgm.events_csv(song.events(*features)):
             print(csv, file=f)
     eprint('Done.')
