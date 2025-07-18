@@ -308,7 +308,7 @@ class Module:
         info_2 = [
             b''.join(builder.byte(n) for n in range(self.order_count)) * self.channel_count,  # orders
             b''.join(builder.byte(n) for n in self.effects_count),  # effects columns
-            builder.byte(1) * self.channel_count,  # channel hide status
+            builder.byte(3) * self.channel_count,  # channel hide status (3 is "shown=1 + oscilloscope=2")
             builder.byte(0) * self.channel_count,  # channel collapse status
             builder.string('') * self.channel_count,  # channel names
             builder.string('') * self.channel_count,  # channel short names
