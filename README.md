@@ -53,7 +53,8 @@ You can append to the command one or more following options. `iii` means integer
 - `--row-duration=fff` - sets duration of a single Furnace row, in samples (1 sample = 1/44100 sec)
 - `--playback-rate=fff` - sets playback rate in Hz (how many rows will get played per second).
 - `--skip-samples=iii` - skips initial `iii` samples before starting conversion. Can be useful to get rid of silence at start.
-- `--ym2612-volume=fff`, `--sn76489-volume` - sets corresponding chip volume, default is 1
+- `--ym2612-volume=fff`, `--sn76489-volume=fff` - sets corresponding chip volume, default is 1
+- `--no-latch` disables YM2612 frequency latching; may be necessary if some FM notes disappear in output Furnace module
 
 ## Limitations
 
