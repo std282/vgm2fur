@@ -2,6 +2,28 @@ from vgm2fur import bitfield
 import copy
 import warnings
 
+class FreqLatch:
+    use = False
+    def __init__(self):
+        self.state = 0
+        self.freq = bitfield.make(0)
+        self.block = 0
+    _low_table = [2, 0, 2]
+    def low(self, data: bitfield.Bitfield):
+        self.freq[7:0] = data[7:0]
+        if not FreqLatch.use: 
+            return (self.freq.all, self.block)
+        self.state = FreqLatch._low_table[self.state]
+        return (self.freq.all, self.block) if self.state == 0 else None
+    _high_table = [1, 1, 0]
+    def high(self, data: bitfield.Bitfield):
+        self.freq[10:8] = data[2:0]
+        self.block = data[5:3]
+        if not FreqLatch.use: 
+            return (self.freq.all, self.block)
+        self.state = FreqLatch._high_table[self.state]
+        return (self.freq.all, self.block) if self.state == 0 else None
+
 class IllFormedEvent(Exception):
     def __init__(self, eventdata):
         super().__init__(eventdata)
@@ -108,26 +130,24 @@ class YM2612:
                     op.ssg_en = data[3]
                 case (p, a) if (a & 0xFC) == 0xA0:
                     ch = self._get_ch(p, a)
-                    freq = bitfield.make(ch.freq)
-                    freq[7:0] = data[7:0]
-                    ch.freq = freq.all
+                    res = ch.latch.low(data)
+                    if res is not None:
+                        ch.freq, ch.block = res
                 case (p, a) if (a & 0xFC) == 0xA4:
                     ch = self._get_ch(p, a)
-                    freq = bitfield.make(ch.freq)
-                    freq[10:8] = data[2:0]
-                    ch.freq = freq.all
-                    ch.block = data[5:3]
+                    res = ch.latch.high(data)
+                    if res is not None:
+                        ch.freq, ch.block = res
                 case (0, a) if (a & 0xFC) == 0xA8:
                     op = self._get_ch3_op(a)
-                    freq = bitfield.make(op.freq)
-                    freq[7:0] = data[7:0]
-                    op.freq = freq.all
+                    res = op.latch.low(data)
+                    if res is not None:
+                        op.freq, op.block = res
                 case (0, a) if (a & 0xFC) == 0xAC:
                     op = self._get_ch3_op(a)
-                    freq = bitfield.make(op.freq)
-                    freq[10:8] = data[2:0]
-                    op.freq = freq.all
-                    op.block = data[5:3]
+                    res = op.latch.high(data)
+                    if res is not None:
+                        op.freq, op.block = res
                 case (p, a) if (a & 0xFC) == 0xB0:
                     ch = self._get_ch(p, a)
                     ch.alg = data[2:0]
@@ -162,6 +182,7 @@ class Channel:
         return self.operators[num - 1]
 
     def _make_most_fields(self):
+        self.latch = FreqLatch()
         self.keyid = 0
         self.opmask = 0
         self.freq = 0
@@ -254,6 +275,7 @@ class Operator3(Operator):
         self._make_most_fields()
         self.freq = 0
         self.block = 0
+        self.latch = FreqLatch()
 
     _fields = Operator._fields + 'freq block'.split()
 

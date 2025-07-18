@@ -36,7 +36,7 @@ def _main():
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:z',
             ['print-istate=', 'version', 'decompress', 'unsampled',
             'print-vgm', 'playback-rate=', 'row-duration=', 'pattern-length=',
-            'skip-samples=', 'sn76489-volume=', 'ym2612-volume='])
+            'skip-samples=', 'sn76489-volume=', 'ym2612-volume=', 'no-latch'])
     except getopt.GetoptError as err:
         raise ArgParseError(err)
 
@@ -96,7 +96,8 @@ def _main():
             case '--sn76489-volume':
                 params.sn76489_volume = _parse_param(param, float)
                 _assert_param(params['sn76489_volume'], lambda x: x >= 0)
-
+            case '--no-latch':
+                params.use_latch = Param(key, False)
 
     try:
         iargs = iter(args)
@@ -110,6 +111,7 @@ def _main():
                 'skip_samples': 'skipped samples count',
                 'ym2612_volume': 'YM2612 volume',
                 'sn76489_volume': 'SN76489 volume',
+                'use_latch': 'FM frequency latch deactivation'
             }
             params.outfile = DefaultValue(None)
             params.playback_rate = DefaultValue(None)
@@ -118,6 +120,7 @@ def _main():
             params.skip_samples = DefaultValue(0)
             params.ym2612_volume = DefaultValue(1.0)
             params.sn76489_volume = DefaultValue(1.0)
+            params.use_latch = DefaultValue(True)
         for arg in iargs:
             params.ignored = Param.positional(arg)
     except StopIteration:
@@ -342,6 +345,7 @@ def convert(params):
             playback_rate = y
 
     eprint('Constructing state table...')
+    chips.ym2612.FreqLatch.use = params.use_latch
     fm_chip, psg_chip = transform.tabulate(song.events,
         length=song.total_wait,
         period=row_duration,
