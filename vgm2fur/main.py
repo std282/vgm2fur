@@ -433,8 +433,10 @@ def print_istate(params):
 
     if params.unsampled:
         eprint('Constructing state table...')
-        t, fm, psg, dac = transform.tabulate_unsampled(song.events,
+        fm, psg, dac = transform.tabulate_unsampled(song.events,
             chips=['ym2612', 'sn76489', 'dac'])
+
+        (t, fm, psg, dac) = transform.merge_unsampled(fm, psg, dac)
 
         eprint('Writing output...')
         def t_csv(t):
