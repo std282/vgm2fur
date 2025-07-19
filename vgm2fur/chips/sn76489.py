@@ -101,7 +101,11 @@ def csv(chip_states, src_features):
                 toft.append(feature)
             case 'nmode':
                 noft.append(feature)
+    if len(snft) == 0:
+        return None
+    return _csv(chip_states, snft, toft, noft)
 
+def _csv(chip_states, snft, toft, noft):
     yield _csv_header(snft, toft, noft)
     for chip in chip_states:
         yield _csv_chip(chip, snft, toft, noft)

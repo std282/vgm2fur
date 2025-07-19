@@ -333,7 +333,7 @@ class Operator3_4(Operator):
 
 _OPMASK_MAP = {'0': '.', '1': '#'}
 
-_CHIP_FEATURES = frozenset('lfo dac fm1 fm2 fm3 fm4 fm5 fm6 fmx freqfm3'.split())
+_CHIP_FEATURES = frozenset('lfo dacen fm1 fm2 fm3 fm4 fm5 fm6 fmx freqfm3'.split())
 _CHANNEL_FEATURES = frozenset('id opmask freqfm alg fb mod pan op1 op2 op3 op4 opx'.split())
 _OPERATOR_FEATURES = frozenset('mult dt tl ar rs dr am sr rr sl ssg'.split())
 def csv(chip_states, src_features):
@@ -347,11 +347,14 @@ def csv(chip_states, src_features):
             chft.append(feature)
         elif feature in _OPERATOR_FEATURES:
             opft.append(feature)
-
     ymft = _norm_chip(ymft)
     chft = _norm_channel(chft)
     opft = _norm_operator(opft)
+    if len(ymft) == 0:
+        return None
+    return _csv(chip_states, ymft, chft, opft)
 
+def _csv(chip_states, ymft, chft, opft):
     yield _csv_header(ymft, chft, opft)
     for chip in chip_states:
         yield _csv_chip(chip, ymft, chft, opft)
@@ -391,7 +394,7 @@ def _csv_header(ymfts, chfts, opfts):
     for ymft in ymfts:
         match ymft:
             case 'lfo': s = 'LFO En,LFO'
-            case 'dac': s = 'DAC En'
+            case 'dacen': s = 'DAC En'
             case 'freqfm3': 
                 s = ','.join([
                     'FM3 Sp En',
@@ -433,7 +436,7 @@ def _csv_chip(ym, ymft, chft, opft):
     for ft in ymft:
         match ft:
             case 'lfo': s = f'{ym.ch(1).lfo_en},{ym.ch(1).lfo}'
-            case 'dac': s = f'{ym.ch(6).dac_en}'
+            case 'dacen': s = f'{ym.ch(6).dac_en}'
             case 'freq3sp':
                 ch3 = ym.ch(3)
                 if ch3.mode:

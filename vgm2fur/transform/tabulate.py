@@ -5,6 +5,11 @@ class TableState(NamedTuple):
     t: int
     fm: chips.YM2612
     psg: chips.SN76489
+    dac: chips.Sampler
+
+    def is_same_as(self, fm, psg, dac):
+        return self.fm == fm and self.psg == psg and self.dac == dac
+
 
 def _tabulate(events):
     fm = chips.YM2612()
@@ -19,20 +24,20 @@ def _tabulate(events):
             case PsgWrite(data):
                 psg.update(data)
             case Wait(delta_t):
-                if len(table) == 0 or table[-1].fm != fm or table[-1].psg != psg:
-                    table.append(TableState(t, fm.copy(), psg.copy()))
+                if len(table) == 0 or not table[-1].is_same_as(fm, psg, dac):
+                    table.append(TableState(t, fm.copy(), psg.copy(), dac.copy()))
                 t += delta_t
             case PlaySample():
-                dac.ptr += 1
+                dac.play()
             case SetSamplePointer(ptr):
-                dac.ptr = ptr
-                dac.keyid += 1
+                dac.set(ptr)
     return table
 
 def _decimate(table, t_end, period, start):
     assert period > 0
     dectable_fm = []
     dectable_psg = []
+    dectable_dac = []
     t = start
     i = 0
     while t < t_end:
@@ -40,8 +45,9 @@ def _decimate(table, t_end, period, start):
             i += 1
         dectable_fm.append(table[i].fm)
         dectable_psg.append(table[i].psg)
+        dectable_dac.append(table[i].dac)
         t += period
-    return dectable_fm, dectable_psg
+    return dectable_fm, dectable_psg, dectable_dac
 
 def tabulate_unsampled(events, /, *, chips):
     events = events(*chips)
@@ -49,24 +55,24 @@ def tabulate_unsampled(events, /, *, chips):
     ts = []
     fms = []
     psgs = []
-    for (t, fm, psg) in table:
+    dacs = []
+    for (t, fm, psg, dac) in table:
         ts.append(t)
         fms.append(fm)
         psgs.append(psg)
-    return (ts, fms, psgs)
+        dacs.append(dac)
+    return (ts, fms, psgs, dacs)
 
 def tabulate(events, /, *, length, period, chips, skip):
     events = events(*chips)
-    fm, psg = _decimate(_tabulate(events), length, period, skip)
-    return_mask = 0
+    fm, psg, dac = _decimate(_tabulate(events), length, period, skip)
+    res = []
     for chip in chips:
         match chip.lower():
-            case 'ym2612': return_mask += 1
-            case 'sn76489': return_mask += 2
-    match return_mask:
-        case 1: return fm
-        case 2: return psg
-        case 3: return (fm, psg)
+            case 'ym2612': res.append(fm)
+            case 'sn76489': res.append(psg)
+            case 'dac': res.append(dac)
+    return tuple(res)
 
 class FmWrite:
     __match_args__ = ('port', 'addr', 'data')

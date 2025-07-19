@@ -433,38 +433,44 @@ def print_istate(params):
 
     if params.unsampled:
         eprint('Constructing state table...')
-        t, fm, psg = transform.tabulate_unsampled(song.events,
-            chips=['ym2612', 'sn76489'])
+        t, fm, psg, dac = transform.tabulate_unsampled(song.events,
+            chips=['ym2612', 'sn76489', 'dac'])
 
         eprint('Writing output...')
-        fm = chips.ym2612_csv(fm, features)
-        psg = chips.sn76489_csv(psg, features)
-        t = ['Sample'] + list(map(str, t))
-        with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
-            for (t_csv, csv_fm, csv_psg) in zip(t, fm, psg):
-                print(','.join([t_csv, csv_fm, csv_psg]), file=f)
-        eprint('Done.')
+        def t_csv(t):
+            yield 'Sample'
+            yield from map(str, t)
+        data = [t_csv(t)]
+        if (fm := chips.ym2612.csv(fm, features)) is not None: data.append(fm)
+        if (psg := chips.sn76489.csv(psg, features)) is not None: data.append(psg)
+        if (dac := chips.sampler.csv(dac, features)) is not None: data.append(dac)
     else:
         pattern_length = params.pattern_length
 
         eprint('Constructing state table...')
-        fm, psg = transform.tabulate(song.events,
+        fm, psg, dac = transform.tabulate(song.events,
             length=song.total_wait,
             period=params.row_duration,
-            chips=['ym2612', 'sn76489'],
+            chips=['ym2612', 'sn76489', 'dac'],
             skip=params.skip_samples)
 
+        def patrow_csv(patlen):
+            yield 'Pat:Row'
+            for i in itertools.count():
+                pat = i // patlen
+                row = i % patlen
+                yield f'{pat}:{row}'
+        data = [patrow_csv(pattern_length)]
+        if (fm := chips.ym2612.csv(fm, features)) is not None: data.append(fm)
+        if (psg := chips.sn76489.csv(psg, features)) is not None: data.append(psg)
+        if (dac := chips.sampler.csv(dac, features)) is not None: data.append(dac)
+    if len(data) == 1:
+        eprint('Nothing to write.')
+    else:
         eprint('Writing output...')
-        fm = chips.ym2612_csv(fm, features)
-        psg = chips.sn76489_csv(psg, features)
-        icsv = iter(zip(itertools.count(-1), fm, psg))
         with _open_write_or(params.outfile, defaultfile=sys.stdout) as f:
-            (_, csv_fm, csv_psg) = next(icsv)
-            print(','.join(['Pat:Row', csv_fm, csv_psg]), file=f)
-            for (n, csv_fm, csv_psg) in icsv:
-                pat = n // pattern_length
-                row = n % pattern_length
-                print(','.join([f'{pat}:{row}', csv_fm, csv_psg]), file=f)
+            for items in zip(*data):
+                print(','.join(items), file=f)
         eprint('Done.')
 
 def _try_decompress(data, method):
