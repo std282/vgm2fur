@@ -1,14 +1,22 @@
 import bisect
 from vgm2fur import furnace
 
-def to_patterns_psg(chip):
+def prepare(chip):
     noted = list(map(_find_best_notes, chip))
     psg1 = _channel_data(noted, 0)
     psg2 = _channel_data(noted, 1)
     psg3 = _channel_data(noted, 2)
     noise = _channel_data(noted, 3)
-    return (_transform(psg1, 0), _transform(psg2, 0), _transform(psg3, 1),
-            _transform_noise(noise))
+    return psg1, psg2, psg3, noise
+
+def to_patterns(chdata, /, *, channel=''):
+    match channel.lower():
+        case 'psg3':
+            return _transform(chdata, 1)
+        case 'noise':
+            return _transform_noise(chdata)
+        case _:
+            return _transform(chdata, 0)
 
 def _make_psg_note_map():
     freqs = [

@@ -3,7 +3,7 @@ import bisect
 from vgm2fur import furnace, bitfield
 from vgm2fur import AppError as Vgm2FurError
 
-def prepare_fm(chip):
+def prepare(chip):
     fm1, fm2, fm3, fm4, fm5, fm6 = _split_fm(chip)
     if _has_csm(fm3):
         raise CsmNotSupported()
@@ -21,29 +21,29 @@ def prepare_fm(chip):
 
     return fm1, fm2, fm3, fm4, fm5, fm6
 
-def collect_fm_voices(*channels, voice_start):
+def collect_voices(channels, voice_start):
     return _collect_voices(channels, voice_start)
 
-def is_fm3_special_mode(channel3):
+def is_special(channel3):
     return (type(channel3[0]) is tuple 
         and type(channel3[0][0]) is tuple
         and len(channel3[0][0]) == 4)
 
-def split_fm3_special_mode(channel3):
-    splitted = ([], [], [], [])
+def split_special(channel3):
+    split = ([], [], [], [])
     for state, voice in channel3:
         for i in range(4):
-            splitted[i].append((state[i], voice))
-    return splitted
+            split[i].append((state[i], voice))
+    return split
 
-def to_patterns_fm(channel, voices):
-    return _transform(channel, voices, 0)
-
-def to_patterns_fm1(channel, voices):
-    return _transform(channel, voices, 1)
-
-def to_patterns_fm6(channel, voices):
-    return _transform(channel, voices, 2)
+def to_patterns(chdata, /, voices, *, channel=''):
+    match channel.lower():
+        case 'fm1':
+            return _transform(chdata, voices, 1)
+        case 'fm6':
+            return _transform(chdata, voices, 2)
+        case _:
+            return _transform(chdata, voices, 0)
 
 class FmFreqClass:
     def __init__(self):

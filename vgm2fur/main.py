@@ -365,10 +365,11 @@ def convert(params):
 
     eprint('Constructing state table...')
     chips.ym2612.FreqLatch.use = params.use_latch
-    fm_chip, psg_chip = transform.tabulate(song.events,
+    chiptable, _ = transform.tabulate(song.events, chips=['ym2612', 'sn76489'])
+
+    ym2612, sn76489 = transform.interpolate(chiptable,
         length=total_wait,
         period=row_duration,
-        chips=['ym2612', 'sn76489'],
         skip=skip_samples)
 
     eprint('Translating state table to tracker events...')
@@ -376,34 +377,34 @@ def convert(params):
     fur.ticks_per_second = playback_rate
     fur.pattern_length = pattern_length
 
-    psg1, psg2, psg3, noise = transform.to_patterns_psg(psg_chip)
-    fm1, fm2, fm3, fm4, fm5, fm6 = transform.prepare_fm(fm_chip)
-    if transform.is_fm3_special_mode(fm3):
+    psg1, psg2, psg3, noise = transform.psg.prepare(sn76489)
+    fm1, fm2, fm3, fm4, fm5, fm6 = transform.fm.prepare(ym2612)
+    if transform.fm.is_special(fm3):
         fur.fm3_special_mode = True
 
     fur.add_instrument(furnace.instr.psg_blank('PSG_BLANK'))
-    fur.add_patterns(psg1, 'psg1')
-    fur.add_patterns(psg2, 'psg2')
-    fur.add_patterns(psg3, 'psg3')
-    fur.add_patterns(noise, 'noise')
+    fur.add_patterns(transform.psg.to_patterns(psg1), 'psg1')
+    fur.add_patterns(transform.psg.to_patterns(psg2), 'psg2')
+    fur.add_patterns(transform.psg.to_patterns(psg3, channel='psg3'), 'psg3')
+    fur.add_patterns(transform.psg.to_patterns(noise, channel='noise'), 'noise')
 
-    voices = transform.collect_fm_voices(fm1, fm2, fm3, fm4, fm5, fm6,
+    voices = transform.fm.collect_voices([fm1, fm2, fm3, fm4, fm5, fm6],
         voice_start=fur.instrument_count)
     for i, (voice, _) in enumerate(sorted(voices.items(), key=lambda x: x[1])):
         fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
-    fur.add_patterns(transform.to_patterns_fm1(fm1, voices), 'fm1')
-    fur.add_patterns(transform.to_patterns_fm(fm2, voices), 'fm2')
+    fur.add_patterns(transform.fm.to_patterns(fm1, voices, channel='fm1'), 'fm1')
+    fur.add_patterns(transform.fm.to_patterns(fm2, voices), 'fm2')
     if fur.fm3_special_mode:
-        fm3o1, fm3o2, fm3o3, fm3o4 = transform.split_fm3_special_mode(fm3)
-        fur.add_patterns(transform.to_patterns_fm(fm3o1, voices), 'fm3o1')
-        fur.add_patterns(transform.to_patterns_fm(fm3o2, voices), 'fm3o2')
-        fur.add_patterns(transform.to_patterns_fm(fm3o3, voices), 'fm3o3')
-        fur.add_patterns(transform.to_patterns_fm(fm3o4, voices), 'fm3o4')
+        fm3o1, fm3o2, fm3o3, fm3o4 = transform.fm.split_special(fm3)
+        fur.add_patterns(transform.fm.to_patterns(fm3o1, voices), 'fm3o1')
+        fur.add_patterns(transform.fm.to_patterns(fm3o2, voices), 'fm3o2')
+        fur.add_patterns(transform.fm.to_patterns(fm3o3, voices), 'fm3o3')
+        fur.add_patterns(transform.fm.to_patterns(fm3o4, voices), 'fm3o4')
     else:
-        fur.add_patterns(transform.to_patterns_fm(fm3, voices), 'fm3')
-    fur.add_patterns(transform.to_patterns_fm(fm4, voices), 'fm4')
-    fur.add_patterns(transform.to_patterns_fm(fm5, voices), 'fm5')
-    fur.add_patterns(transform.to_patterns_fm6(fm6, voices), 'fm6')
+        fur.add_patterns(transform.fm.to_patterns(fm3, voices), 'fm3')
+    fur.add_patterns(transform.fm.to_patterns(fm4, voices), 'fm4')
+    fur.add_patterns(transform.fm.to_patterns(fm5, voices), 'fm5')
+    fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
 
     fur.ym2612_volume = params.ym2612_volume
     fur.sn76489_volume = params.sn76489_volume
@@ -433,10 +434,10 @@ def print_istate(params):
 
     if params.unsampled:
         eprint('Constructing state table...')
-        fm, psg, dac = transform.tabulate_unsampled(song.events,
+        chiptable, _ = transform.tabulate(song.events,
             chips=['ym2612', 'sn76489', 'dac'])
 
-        (t, fm, psg, dac) = transform.merge_unsampled(fm, psg, dac)
+        (t, fm, psg, dac) = transform.merge(chiptable)
 
         eprint('Writing output...')
         def t_csv(t):
@@ -450,10 +451,11 @@ def print_istate(params):
         pattern_length = params.pattern_length
 
         eprint('Constructing state table...')
-        fm, psg, dac = transform.tabulate(song.events,
+        chiptable, _ = transform.tabulate(song.events, chips=['ym2612', 'sn76489', 'dac'])
+
+        fm, psg, dac = transform.interpolate(chiptable, 
             length=song.total_wait,
             period=params.row_duration,
-            chips=['ym2612', 'sn76489', 'dac'],
             skip=params.skip_samples)
 
         def patrow_csv(patlen):
