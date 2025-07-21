@@ -14,8 +14,8 @@ def sample(data, rate, name=''):
         builder.byte(0),  # dithering: no
         builder.long(0xFFFFFFFF),  # loop start: none  
         builder.long(0xFFFFFFFF),  # loop end: none
-        builder.long(0) * 4,  # sample presence bitfields
+        builder.long(0xFFFFFFFF) * 4,  # sample presence bitfields
         data
     ]
-    samp[1] = builder.long(builder.bl_length(samp))
+    samp[1] = builder.long(builder.bl_length(samp[2:]))
     return b''.join(samp)

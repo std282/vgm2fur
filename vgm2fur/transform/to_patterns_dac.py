@@ -46,7 +46,10 @@ def collect_stuff(dac, datablocks, instr_start):
     mapping = {}
     samples = []
     instrs = []
+    sample_start = 0
     for play in dac:
+        if play.length == 0:
+            continue
         pos = (play.begin, play.length)
         if pos not in mapping:
             mapping[pos] = (note, instr_no)
@@ -57,7 +60,7 @@ def collect_stuff(dac, datablocks, instr_start):
                 instr_no += 1
                 instrs.append(_sample_map(sample_start, MAP_CAPACITY))
                 sample_start += MAP_CAPACITY
-            samples.append((sample_bank.cut(play), play.rate))
+            samples.append((sample_bank.cut(play), int(play.rate)))
     if len(mapping) != 0:
         instrs.append(_sample_map(sample_start, note - furnace.notes.C0))
     return mapping, samples, instrs
@@ -69,11 +72,19 @@ def prepare(dac):
 def to_patterns(dac, /, *, mapping, rowdur):
     keyid_c = -1
     left = -1
+    vol = 0x70
     for keyid, begin, length in dac:
-        if keyid != keyid_c:
+        if length == 0:
+            if left > 0:
+                yield furnace.Entry(note=furnace.notes.Off)
+                left = -1
+            else:
+                yield furnace.Entry()
+        elif keyid != keyid_c:
             note, ins = mapping[begin, length]
             left = (length + rowdur - 1) // rowdur
-            yield furnace.Entry(note=note, ins=ins)
+            yield furnace.Entry(note=note, ins=ins, vol=vol)
+            keyid_c = keyid
         else:
             if left > 0:
                 yield furnace.Entry()

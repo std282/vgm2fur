@@ -351,7 +351,7 @@ class Module:
         ]
 
         # computing song info size
-        info_size = sum(map(builder.bl_length, [info[2:], ins_ptr, pat_ptr, info_2]))
+        info_size = sum(map(builder.bl_length, [info[2:], ins_ptr, samp_ptr, pat_ptr, info_2]))
         # writing song info size to song info
         info[1] = builder.long(info_size)
         # updating file pointer as if we have already written song info
@@ -388,7 +388,7 @@ class Module:
             # writing sample data pointer to song info
             samp_ptr[i] = builder.long(fileptr)
             # updating file pointer as if we have already written sample data
-            fileptr += len(ins)
+            fileptr += len(samp)
 
         patterns = _flatten_list_list(self.pattern_matrix)
         assert len(patterns) == self.pattern_count
@@ -402,7 +402,7 @@ class Module:
         file += b''.join(info + ins_ptr + samp_ptr + pat_ptr + info_2)
 
         # writing asset directories
-        file += ins_adir + empty_adir
+        file += ins_adir + empty_adir + samp_adir
         # writing instrument data
         file += b''.join(self.instruments)
         # writing sample data

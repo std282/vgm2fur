@@ -28,7 +28,7 @@ class Sampler:
     def pause(self, value):
         self._pause[0] = value
     @property
-    def sample_rate(self):
+    def rate(self):
         return vgm.SAMPLE_RATE * self.length / self.duration
 
     def __eq__(self, other):
@@ -44,6 +44,7 @@ class Sampler:
     def play(self):
         self.length += 1
         self.duration += self.pause
+        self.pause = 0
 
     def wait(self, duration):
         self.pause += duration

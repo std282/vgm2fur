@@ -142,21 +142,27 @@ def _ins_feature_fm(voice):
     return b''.join(feature)
 
 def _ins_feature_sample_map(samplist):
+    samplist = list(samplist)
     feature = [
         b'SM',
+        builder.short(0),
+        builder.short(samplist[0]),
         builder.byte(1),  # flags: use sample map
         builder.byte(31),  # not sure why 31
     ]
     count = 0
     for samp in samplist:
         feature += [
-            builder.short(notes.C0 + count),
+            builder.short(notes.C4 - notes.C0),
             builder.short(samp)
         ]
+        count += 1
     assert count <= 120
     while count < 120:
         feature += [
-            builder.short(notes.C0 + count),
+            builder.short(count),
             builder.short(0xFFFF)
         ]
+        count += 1
+    feature[1] = builder.short(builder.bl_length(feature[2:]))
     return b''.join(feature)

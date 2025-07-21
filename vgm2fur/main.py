@@ -365,7 +365,7 @@ def convert(params):
 
     eprint('Constructing state table...')
     chips.ym2612.FreqLatch.use = params.use_latch
-    chiptable, datablocks = transform.tabulate(song.events, chips=['ym2612', 'sn76489', 'dac'])
+    chiptable, datablocks = transform.tabulate(song.events, chips=['ym2612', 'sn76489', 'dac', 'data'])
 
     ym2612, sn76489, dac = transform.interpolate(chiptable,
         length=total_wait,
@@ -415,7 +415,7 @@ def convert(params):
 
         # fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
         dac = transform.dac.prepare(dac)
-        fur.add_patterns(transform.to_patterns_fm6_dac(fm6, voices, dac, mapping, row_duration), 'fm6')
+        fur.add_patterns(transform.to_patterns_fm6_dac(fm6, dac, voices, dac_map, rowdur=row_duration), 'fm6')
     else:
         eprint('No DAC data found.')
         fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
