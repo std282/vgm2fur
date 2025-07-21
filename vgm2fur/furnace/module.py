@@ -341,7 +341,7 @@ class Module:
             builder.long(0),     # patchbay connection count
             builder.byte(1),     # automatic patchbay
             builder.byte(0) * 8,  # yet more compat flags
-            builder.byte(0),     # speed pattern length
+            builder.byte(1),     # speed pattern length
             builder.byte(1),     # speed pattern
             builder.byte(0) * 15,  # speed pattern
             builder.byte(0),     # groove entry count
