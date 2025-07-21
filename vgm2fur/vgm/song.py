@@ -38,9 +38,13 @@ class Song:
                 case 'dac':
                     comset |= {*range(0x90, 0x96), 0xE0}
         _seek_vgm_data_start(unp)
-        for com in _events(unp):
+        for com in _events(unp, self.version):
             if com[0] in comset:
                 yield com
+
+    @property
+    def version(self):
+        return int.from_bytes(self.data[0x08:0x0C], 'little')
 
     @property
     def total_wait(self):
@@ -72,10 +76,18 @@ def _seek_vgm_data_start(unp):
     else:
         unp.offset = 0x34 + rel
 
+class UnboundSize:
+    pass
+
+class VersionDependent:
+    __match_args__ = ('condition',)
+    def __init__(self, condition):
+        self.condition = condition
+
 def _make_com_dict():
     _0_ARGS = {0x62, 0x63, 0x66, *range(0x70, 0x90)}
     _1_ARGS = {*range(0x30, 0x40), 0x4F, 0x50, 0x94}
-    _2_ARGS = {0x40, *range(0x41, 0x4F), *range(0x51, 0x60), 0x61, 0xA0, *range(0xB0, 0xC0)}
+    _2_ARGS = {0x40, *range(0x51, 0x60), 0x61, 0xA0, *range(0xB0, 0xC0)}
     _3_ARGS = {*range(0xC0, 0xE0)}
     _4_ARGS = {0x90, 0x91, 0x95, *range(0xE0, 0x100)}
     coms = [_0_ARGS, _1_ARGS, _2_ARGS, _3_ARGS, _4_ARGS]
@@ -83,29 +95,34 @@ def _make_com_dict():
     for argcount in range(len(coms)):
         for com in coms[argcount]:
             comdict[com] = argcount
-    comdict[0x67] = -1 # unbound size
+    _1_or_2 = VersionDependent(lambda v: 1 if v < 0x160 else 2)
+    for com in range(0x41, 0x4F):
+        comdict[com] = _1_or_2
+    comdict[0x67] = UnboundSize()
     comdict[0x68] = 11
     comdict[0x92] = 5
     comdict[0x93] = 10
     return comdict
 
 _COM_NARGS = _make_com_dict()
-def _events(unp):
+def _events(unp, version):
     try:
         while True:
             com = unp.byte()
             if com == 0x66:
                 break
             match _COM_NARGS.get(com):
-                case -1:
-                    assert com == 0x67
+                case UnboundSize() if com == 0x67:
                     unp.expect('B', 0x66)
                     (type, length) = unp.unpack('BL')
                     data = unp.bytes(length)
                     yield (com, type, data)
                 case 0:
-                    yield (com, )
+                    yield (com,)
                 case int(n):
+                    yield tuple([com] + [unp.byte() for _ in range(n)])
+                case VersionDependent(condition):
+                    n = condition(version)
                     yield tuple([com] + [unp.byte() for _ in range(n)])
                 case _:
                     raise UnknownCommand(com)
