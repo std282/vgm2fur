@@ -37,6 +37,7 @@ def _tabulate(events):
                 table_psg.append(TableEntry(t, psg.copy()))
                 table_dac.append(TableEntry(t, dac.copy()))
                 t += delta_t
+                dac.wait(delta_t)
             case Wait(delta_t):
                 if table_fm[-1].chip != fm:
                     table_fm.append(TableEntry(t, fm.copy()))
@@ -45,6 +46,7 @@ def _tabulate(events):
                 if table_dac[-1].chip != dac:
                     table_dac.append(TableEntry(t, dac.copy()))
                 t += delta_t
+                dac.wait(delta_t)
     return table_fm, table_psg, table_dac, table_data
 
 def _find_index(t, i, table):

@@ -11,12 +11,10 @@ def prepare(chip):
 
 def to_patterns(chdata, /, *, channel=''):
     match channel.lower():
-        case 'psg3':
-            return _transform(chdata, 1)
         case 'noise':
             return _transform_noise(chdata)
         case _:
-            return _transform(chdata, 0)
+            return _transform(chdata)
 
 def _make_psg_note_map():
     freqs = [
@@ -81,10 +79,8 @@ def _find_best_notes(psg):
     return ((n1, d1, v1), (n2, d2, v2), (n3, d3, v3), (mn, vn))
 
 def _channel_data(notetable, channel):
-    if 0 <= channel and channel < 2:
+    if 0 <= channel and channel < 3:
         return [x[channel] for x in notetable]
-    elif channel == 2:
-        return [(n, d, v, m) for (_, _, (n, d, v), (m, _)) in notetable]
     elif channel == 3:
         return [(n, d, v, m) for (_, _, (n, d, _), (m, v)) in notetable]
 
@@ -96,33 +92,16 @@ def _fx_pitch(delta):
     else:
         return None
 
-def _transform(psglist, type):
+def _transform(psglist):
     note_c = furnace.notes.Off
     vol_c = 0
     disp_c = 0
-    for psgentry in psglist:
-        match type:
-            case 0: # tonal
-                (note, disp, vol) = psgentry
-                silent = False
-            case 1: # psg3
-                (note, disp, vol, mode) = psgentry
-                # silent = ((mode & 3) == 3)
-                silent = False
-            case 2: # noise
-                (note, disp, vol, mode) = psgentry
-                silent = ((mode & 3) != 3)
-
-        if silent:
+    for note, disp, vol in psglist:
+        vol = 15 - vol
+        if vol == 0:
             note = furnace.notes.Off
             disp = 0
-            vol = 0
-        else:
-            vol = 15 - vol
-            if vol == 0:
-                note = furnace.notes.Off
-                disp = 0
-            disp = -disp
+        disp = -disp
 
         mask = 0
         mask += 1 if note != note_c else 0
@@ -158,8 +137,7 @@ def _transform_noise(psglist):
     vol_c = 0
     disp_c = 0
     fmode_c = -1
-    for psgentry in psglist:
-        (note, disp, vol, mode) = psgentry
+    for note, disp, vol, mode in psglist:
         wave = mode >> 2
         spec = mode & 3
         fmode = wave | (0x10 if spec == 3 else 0)

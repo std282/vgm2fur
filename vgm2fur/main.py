@@ -365,9 +365,9 @@ def convert(params):
 
     eprint('Constructing state table...')
     chips.ym2612.FreqLatch.use = params.use_latch
-    chiptable, _ = transform.tabulate(song.events, chips=['ym2612', 'sn76489'])
+    chiptable, datablocks = transform.tabulate(song.events, chips=['ym2612', 'sn76489', 'dac'])
 
-    ym2612, sn76489 = transform.interpolate(chiptable,
+    ym2612, sn76489, dac = transform.interpolate(chiptable,
         length=total_wait,
         period=row_duration,
         skip=skip_samples)
@@ -382,16 +382,16 @@ def convert(params):
     if transform.fm.is_special(fm3):
         fur.fm3_special_mode = True
 
-    fur.add_instrument(furnace.instr.psg_blank('PSG_BLANK'))
+    fur.add_instrument(furnace.instr.psg_blank(name='PSG_BLANK'))
     fur.add_patterns(transform.psg.to_patterns(psg1), 'psg1')
     fur.add_patterns(transform.psg.to_patterns(psg2), 'psg2')
-    fur.add_patterns(transform.psg.to_patterns(psg3, channel='psg3'), 'psg3')
+    fur.add_patterns(transform.psg.to_patterns(psg3), 'psg3')
     fur.add_patterns(transform.psg.to_patterns(noise, channel='noise'), 'noise')
 
     voices = transform.fm.collect_voices([fm1, fm2, fm3, fm4, fm5, fm6],
-        voice_start=fur.instrument_count)
+        instr_start=fur.instrument_count)
     for i, (voice, _) in enumerate(sorted(voices.items(), key=lambda x: x[1])):
-        fur.add_instrument(furnace.instr.fm_opn(voice, f'FM_VOICE_{i}'))
+        fur.add_instrument(furnace.instr.fm_opn(voice, name=f'FM_VOICE_{i}'))
     fur.add_patterns(transform.fm.to_patterns(fm1, voices, channel='fm1'), 'fm1')
     fur.add_patterns(transform.fm.to_patterns(fm2, voices), 'fm2')
     if fur.fm3_special_mode:
@@ -404,7 +404,21 @@ def convert(params):
         fur.add_patterns(transform.fm.to_patterns(fm3, voices), 'fm3')
     fur.add_patterns(transform.fm.to_patterns(fm4, voices), 'fm4')
     fur.add_patterns(transform.fm.to_patterns(fm5, voices), 'fm5')
-    fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
+
+    dac_map, dac_samps, dac_insts = transform.dac.collect_stuff(
+        dac, datablocks, instr_start=fur.instrument_count)
+    if dac_map is not None:
+        for i, (sampdata, samprate) in enumerate(dac_samps):
+            fur.add_sample(furnace.sample(sampdata, samprate, name=f'SAMPLE_{i}'))
+        for i, sampmap in enumerate(dac_insts):
+            fur.add_instrument(furnace.instr.sample_map(sampmap, name=f'SAMPLE_MAP_{i}'))
+
+        # fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
+        dac = transform.dac.prepare(dac)
+        fur.add_patterns(transform.to_patterns_fm6_dac(fm6, voices, dac, mapping, row_duration), 'fm6')
+    else:
+        eprint('No DAC data found.')
+        fur.add_patterns(transform.fm.to_patterns(fm6, voices, channel='fm6'), 'fm6')
 
     fur.ym2612_volume = params.ym2612_volume
     fur.sn76489_volume = params.sn76489_volume

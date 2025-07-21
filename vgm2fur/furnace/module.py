@@ -162,6 +162,7 @@ class Module:
         self.order_count = 0
         self.pattern_count = 0
         self.instruments = []
+        self.samples = []
         self.ym2612_volume = 1.0
         self.sn76489_volume = 1.0
         self.song_comment = ''
@@ -243,6 +244,9 @@ class Module:
     def add_instrument(self, ins):
         self.instruments.append(ins)
 
+    def add_sample(self, samp):
+        self.samples.append(samp)
+
     def prebuild(self):
         for chno, ch in enumerate(self.pattern_matrix):
             index = 0
@@ -288,7 +292,7 @@ class Module:
             builder.byte(0),   # highlight B
             builder.short(len(self.instruments)),
             builder.short(0),  # wavetable count
-            builder.short(0),  # sample count
+            builder.short(len(self.samples)),
             builder.long(self.pattern_count),
             builder.byte(system),  # system: Genesis or Genesis FM3 sp.
             builder.byte(0) * 31,  # end of system list + 30 bytes padding
@@ -304,6 +308,7 @@ class Module:
         ]
 
         ins_ptr = [builder.long(0)] * len(self.instruments)
+        samp_ptr = [builder.long(0)] * len(self.samples)
         pat_ptr = [builder.long(0)] * self.pattern_count
         info_2 = [
             b''.join(builder.byte(n) for n in range(self.order_count)) * self.channel_count,  # orders
@@ -359,18 +364,30 @@ class Module:
         # updating file pointer with as if we have already written it
         fileptr += len(ins_adir)
 
-        # writing wavetable and sample asset directory pointer to song info
+        # writing wavetable asset directory pointer to song info
         info_2[-2] = builder.long(fileptr)
-        info_2[-1] = info_2[-2]
         # creating empty asset directory data
         empty_adir = _make_empty_asset_dir()
         # updating file pointer with as if we have already written it
         fileptr += len(empty_adir)
 
+        # writing sample asset directory pointer to song info
+        info_2[-1] = builder.long(fileptr)
+        # creating sample asset directory data
+        samp_adir = _make_sample_asset_dir(len(self.samples))
+        # updating file pointer with as if we have already written it
+        fileptr += len(samp_adir)
+
         for i, ins in enumerate(self.instruments):
             # writing instrument data pointer to song info
             ins_ptr[i] = builder.long(fileptr)
             # updating file pointer as if we have already written instrument data
+            fileptr += len(ins)
+
+        for i, samp in enumerate(self.samples):
+            # writing sample data pointer to song info
+            samp_ptr[i] = builder.long(fileptr)
+            # updating file pointer as if we have already written sample data
             fileptr += len(ins)
 
         patterns = _flatten_list_list(self.pattern_matrix)
@@ -382,12 +399,14 @@ class Module:
             fileptr += len(pat)
 
         # writing song info
-        file += b''.join(info + ins_ptr + pat_ptr + info_2)
+        file += b''.join(info + ins_ptr + samp_ptr + pat_ptr + info_2)
 
         # writing asset directories
         file += ins_adir + empty_adir
         # writing instrument data
         file += b''.join(self.instruments)
+        # writing sample data
+        file += b''.join(self.samples)
         # writing pattern data
         file += b''.join(patterns)
 
@@ -405,6 +424,18 @@ def _make_instrument_asset_dir(instcount):
         builder.string(''),  # dir name
         builder.short(instcount),  # no. of assets in dir
         b''.join(builder.byte(x) for x in range(instcount))  # assets in dir
+    ]
+    adir[1] = builder.long(builder.bl_length(adir[2:]))
+    return b''.join(adir)
+
+def _make_sample_asset_dir(sampcount):
+    adir = [
+        b'ADIR',
+        builder.long(0),  # size
+        builder.long(1),  # no. of dirs
+        builder.string(''),  # dir name
+        builder.short(sampcount),  # no. of assets in dir
+        b''.join(builder.byte(x) for x in range(sampcount))  # assets in dir
     ]
     adir[1] = builder.long(builder.bl_length(adir[2:]))
     return b''.join(adir)

@@ -1,17 +1,35 @@
+from vgm2fur import vgm
+
 class Sampler:
     def __init__(self, /, *, noinit=False):
         if noinit: return
         self.keyid = 0
         self.begin = 0
+        self._duration = [0]
+        self._pause = [0]
         self._length = [0]
 
     @property
     def length(self):
         return self._length[0]
-
     @length.setter
     def length(self, value):
         self._length[0] = value
+    @property
+    def duration(self):
+        return self._duration[0]
+    @duration.setter
+    def duration(self, value):
+        self._duration[0] = value
+    @property
+    def pause(self):
+        return self._pause[0]
+    @pause.setter
+    def pause(self, value):
+        self._pause[0] = value
+    @property
+    def sample_rate(self):
+        return vgm.SAMPLE_RATE * self.length / self.duration
 
     def __eq__(self, other):
         return self.keyid == other.keyid
@@ -19,16 +37,24 @@ class Sampler:
     def set(self, ptr):
         self.begin = ptr
         self._length = [0]
+        self._duration = [0]
+        self._pause = [0]
         self.keyid += 1
 
     def play(self):
         self.length += 1
+        self.duration += self.pause
+
+    def wait(self, duration):
+        self.pause += duration
 
     def copy(self):
         clone = Sampler(noinit=True)
         clone.keyid = self.keyid
         clone.begin = self.begin
         clone._length = self._length
+        clone._duration = self._duration
+        clone._pause = self._pause
         return clone
 
 def csv(chip_states, features):

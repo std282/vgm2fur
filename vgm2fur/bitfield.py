@@ -47,7 +47,9 @@ class Bitfield:
     @property
     def all(self):
         return self.value
-
+    @all.setter
+    def all(self, value):
+        self.value = value
 
 class named:
     def __init__(self, a, b):

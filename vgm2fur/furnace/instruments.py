@@ -1,6 +1,7 @@
 from typing import NamedTuple
 
 from . import builder
+from . import notes
 from .module import TARGET_FURNACE_VERSION
 from vgm2fur import bitfield
 
@@ -29,28 +30,42 @@ class FMVoice(NamedTuple):
 def fm_opn(voice, name=''):
     ins = [
         b'INS2',
-        builder.pack('L', 0),
-        builder.pack('H', TARGET_FURNACE_VERSION),
-        builder.pack('H', 1), # instrument type
+        builder.long(0),
+        builder.short(TARGET_FURNACE_VERSION),
+        builder.short(1),  # instrument type
         _ins_feature_name(name),
         _ins_feature_fm(voice),
         _ins_feature_end()
     ]
     length = builder.bl_length(ins[2:])
-    ins[1] = builder.pack('L', length)
+    ins[1] = builder.long(length)
+    return b''.join(ins)
+
+def sample_map(samplist, name=''):
+    ins = [
+        b'INS2',
+        builder.long(0),
+        builder.short(TARGET_FURNACE_VERSION),
+        builder.short(4),  # instrument type
+        _ins_feature_name(name),
+        _ins_feature_sample_map(samplist),
+        _ins_feature_end()
+    ]
+    length = builder.bl_length(ins[2:])
+    ins[1] = builder.long(length)
     return b''.join(ins)
 
 def psg_blank(name=''):
     ins = [
         b'INS2',
-        builder.pack('L', 0),
-        builder.pack('H', TARGET_FURNACE_VERSION),
-        builder.pack('H', 0), # instrument type
+        builder.long(0),
+        builder.short(TARGET_FURNACE_VERSION),
+        builder.short(0),  # instrument type
         _ins_feature_name(name),
         _ins_feature_end()
     ]
     length = builder.bl_length(ins[2:])
-    ins[1] = builder.pack('L', length)
+    ins[1] = builder.long(length)
     return b''.join(ins)
 
 def _ins_feature_name(name):
@@ -124,4 +139,24 @@ def _ins_feature_fm(voice):
             builder.byte(0),
         ]
     feature[1] = builder.short(builder.bl_length(feature[2:]))
+    return b''.join(feature)
+
+def _ins_feature_sample_map(samplist):
+    feature = [
+        b'SM',
+        builder.byte(1),  # flags: use sample map
+        builder.byte(31),  # not sure why 31
+    ]
+    count = 0
+    for samp in samplist:
+        feature += [
+            builder.short(notes.C0 + count),
+            builder.short(samp)
+        ]
+    assert count <= 120
+    while count < 120:
+        feature += [
+            builder.short(notes.C0 + count),
+            builder.short(0xFFFF)
+        ]
     return b''.join(feature)

@@ -21,8 +21,8 @@ def prepare(chip):
 
     return fm1, fm2, fm3, fm4, fm5, fm6
 
-def collect_voices(channels, voice_start):
-    return _collect_voices(channels, voice_start)
+def collect_voices(channels, instr_start):
+    return _collect_voices(channels, instr_start)
 
 def is_special(channel3):
     return (type(channel3[0]) is tuple 
@@ -39,11 +39,11 @@ def split_special(channel3):
 def to_patterns(chdata, /, voices, *, channel=''):
     match channel.lower():
         case 'fm1':
-            return _transform(chdata, voices, 1)
+            return _transform_fm1(chdata, voices)
         case 'fm6':
-            return _transform(chdata, voices, 2)
+            return _transform_fm6(chdata, voices)
         case _:
-            return _transform(chdata, voices, 0)
+            return _transform(chdata, voices)
 
 class FmFreqClass:
     def __init__(self):
@@ -339,7 +339,7 @@ def _fx_lfo(value):
     else:
         return furnace.effects.lfo(0x10 + value)
 
-def _transform(ch, voices, type):
+def _transform_fm1(ch, voices):
     note_c = furnace.notes.Off
     disp_c = 0
     vol_c = 0
@@ -348,22 +348,8 @@ def _transform(ch, voices, type):
     pan_c = 0
     lfo_c = None
     legato = False
-    for state in ch:
-        lfo = lfo_c
-        match type:
-            case 1:
-                key, voice, lfo = state
-                silent = False
-            case 2:
-                key, voice, dac = state
-                silent = (dac != 0)
-            case _:
-                key, voice = state
-                silent = False
-        if silent:
-            note = furnace.notes.Off
-        else:
-            note, disp, vol, keyid, pan = key
+    for key, voice, lfo in ch:
+        note, disp, vol, keyid, pan = key
         fx = []
 
         if lfo != lfo_c:
@@ -414,3 +400,121 @@ def _transform(ch, voices, type):
             disp_c = disp
             vol_c = vol
             pan_c = pan
+
+def _transform(ch, voices):
+    note_c = furnace.notes.Off
+    disp_c = 0
+    vol_c = 0
+    keyid_c = -1
+    ins_c = -1
+    pan_c = 0
+    legato = False
+    for key, voice in ch:
+        note, disp, vol, keyid, pan = key
+        fx = []
+
+        if note == furnace.notes.Off:
+            if legato: fx.append(_fx_legato(0))
+            if note == note_c:
+                note = None
+            yield furnace.Entry(note=note, fx=fx)
+            note_c = furnace.notes.Off
+            disp_c = 0
+            vol_c = 0
+            legato = False
+            continue
+
+        ins = voices[voice]
+        if keyid != keyid_c:
+            if disp != 0: fx.append(_fx_pitch(disp))
+            if legato: fx.append(_fx_legato(0))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            yield furnace.Entry(note=note, ins=ins, vol=vol, fx=fx)
+            note_c = note
+            disp_c = disp
+            vol_c = vol
+            keyid_c = keyid
+            ins_c = ins
+            pan_c = pan
+            legato = False
+        elif note != note_c or ins != ins_c:
+            if disp != 0: fx.append(_fx_pitch(disp))
+            if not legato: fx.append(_fx_legato(1))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            ins = voices[voice]
+            yield furnace.Entry(note=note, ins=ins, vol=vol, fx=fx)
+            note_c = note
+            disp_c = disp
+            vol_c = vol
+            ins_c = ins
+            pan_c = pan
+            legato = True
+        else:
+            if disp != disp_c: fx.append(_fx_pitch(disp - disp_c))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            vol_o = vol if vol != vol_c else None
+            yield furnace.Entry(vol=vol_o, fx=fx)
+            disp_c = disp
+            vol_c = vol
+            pan_c = pan
+
+def _transform_fm6(ch, voices):
+    note_c = furnace.notes.Off
+    disp_c = 0
+    vol_c = 0
+    keyid_c = -1
+    ins_c = -1
+    pan_c = 0
+    legato = False
+    for key, voice, dacen in ch:
+        if dacen:
+            note = furnace.notes.Off
+        else:
+            note, disp, vol, keyid, pan = key
+        fx = []
+
+        if note == furnace.notes.Off:
+            if legato: fx.append(_fx_legato(0))
+            if note == note_c:
+                note = None
+            yield furnace.Entry(note=note, fx=fx)
+            note_c = furnace.notes.Off
+            disp_c = 0
+            vol_c = 0
+            legato = False
+            continue
+
+        ins = voices[voice]
+        if keyid != keyid_c:
+            if disp != 0: fx.append(_fx_pitch(disp))
+            if legato: fx.append(_fx_legato(0))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            yield furnace.Entry(note=note, ins=ins, vol=vol, fx=fx)
+            note_c = note
+            disp_c = disp
+            vol_c = vol
+            keyid_c = keyid
+            ins_c = ins
+            pan_c = pan
+            legato = False
+        elif note != note_c or ins != ins_c:
+            if disp != 0: fx.append(_fx_pitch(disp))
+            if not legato: fx.append(_fx_legato(1))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            ins = voices[voice]
+            yield furnace.Entry(note=note, ins=ins, vol=vol, fx=fx)
+            note_c = note
+            disp_c = disp
+            vol_c = vol
+            ins_c = ins
+            pan_c = pan
+            legato = True
+        else:
+            if disp != disp_c: fx.append(_fx_pitch(disp - disp_c))
+            if pan != pan_c: fx.append(_fx_pan(pan))
+            vol_o = vol if vol != vol_c else None
+            yield furnace.Entry(vol=vol_o, fx=fx)
+            disp_c = disp
+            vol_c = vol
+            pan_c = pan
+
