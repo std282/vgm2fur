@@ -76,81 +76,135 @@ def _seek_vgm_data_start(unp):
     else:
         unp.offset = 0x34 + rel
 
-class UnboundSize:
+class Unpack:
+    __match_args__ = ('format',)
+    def __init__(self, format):
+        self.format = format
+
+class NoParams:
     pass
 
-class VersionDependent:
-    __match_args__ = ('condition',)
-    def __init__(self, condition):
-        self.condition = condition
+class SpecialCase:
+    __match_args__ = ('com',)
+    def __init__(self, com):
+        self.com = com
 
-def _make_com_dict():
-    _0_ARGS = {0x62, 0x63, 0x66, *range(0x70, 0x90)}
-    _1_ARGS = {*range(0x30, 0x40), 0x4F, 0x50, 0x94}
-    _2_ARGS = {0x40, *range(0x51, 0x60), 0x61, 0xA0, *range(0xB0, 0xC0)}
-    _3_ARGS = {*range(0xC0, 0xE0)}
-    _4_ARGS = {0x90, 0x91, 0x95, *range(0xE0, 0x100)}
-    coms = [_0_ARGS, _1_ARGS, _2_ARGS, _3_ARGS, _4_ARGS]
-    comdict = dict()
-    for argcount in range(len(coms)):
-        for com in coms[argcount]:
-            comdict[com] = argcount
-    _1_or_2 = VersionDependent(lambda v: 1 if v < 0x160 else 2)
-    for com in range(0x41, 0x4F):
-        comdict[com] = _1_or_2
-    comdict[0x67] = UnboundSize()
-    comdict[0x68] = 11
-    comdict[0x92] = 5
-    comdict[0x93] = 10
-    return comdict
+class irange:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+    def __iter__(self):
+        x = self.a
+        while x <= self.b:
+            yield x
+            x += 1
+    def __contains__(self, x):
+        return self.a <= x and x <= self.b
 
-_COM_NARGS = _make_com_dict()
+def _make_com_kinds():
+    kinds = {}
+    noparams = [0x62, 0x63, *irange(0x70, 0x8F)]
+    unpack = [
+        ([*irange(0x30, 0x3F), 0x4F, 0x50, 0x94], 'B'),
+        ([0x40, *irange(0x51, 0x5F), *irange(0xA0, 0xAF), *irange(0xB0, 0xBF)], 'BB'),
+        ([*irange(0xC9, 0xCF), *irange(0xD0, 0xDF)], 'BBB'),
+        ([*irange(0xE2, 0xFF), 0x90, 0x91], 'BBBB'),
+        ([0x61], 'H'),
+        ([0xC0, 0xC1, 0xC2], 'HB'),
+        ([*irange(0xC4, 0xC8)], '>HB'),
+        ([0xC3], 'BH'),
+        ([0xE1], '>HH'),
+        ([0xE0], 'L'),
+        ([0x92], 'BL'),
+        ([0x93], 'BLBL'),
+        ([0x95], 'BHB'),
+    ]
+    special = [*irange(0x41, 0x4E), 0x66, 0x67, 0x68]
+    for command in noparams:
+        kinds[command] = NoParams()
+    for commands, format in unpack:
+        for command in commands:
+            kinds[command] = Unpack(format)
+    for command in special:
+        kinds[command] = SpecialCase(command)
+    return kinds
+
+def _unpack_24bit(unp):
+    return int.from_bytes(unp.bytes(3), 'little')
+
+_COM_KINDS = _make_com_kinds()
 def _events(unp, version):
-    try:
-        while True:
-            com = unp.byte()
-            if com == 0x66:
-                break
-            match _COM_NARGS.get(com):
-                case UnboundSize() if com == 0x67:
-                    unp.expect('B', 0x66)
-                    (type, length) = unp.unpack('BL')
-                    data = unp.bytes(length)
-                    yield (com, type, data)
-                case 0:
-                    yield (com,)
-                case int(n):
-                    yield tuple([com] + [unp.byte() for _ in range(n)])
-                case VersionDependent(condition):
-                    n = condition(version)
-                    yield tuple([com] + [unp.byte() for _ in range(n)])
-                case _:
-                    raise UnknownCommand(com)
-    except unpacker.NoDataError:
-        pass
+    done = False
+    while not done:
+        com = unp.byte()
+        match _COM_KINDS.get(com):
+            case NoParams():
+                yield (com,)
+            case Unpack(format):
+                yield (com,) + unp.unpack_tuple(format)
+            case SpecialCase(x) if x in irange(0x41, 0x4E):
+                if version >= 0x160:
+                    yield (com,) + unp.unpack('BB')
+                else:
+                    yield (com, unp.byte())
+            case SpecialCase(0x66):
+                done = True
+            case SpecialCase(0x67):
+                unp.expect('B', 0x66)
+                type, length = unp.unpack('BL')
+                payload = unp.bytes(length)
+                yield (com, type, payload)
+            case SpecialCase(0x68):
+                unp.expect('B', 0x66)
+                type = unp.unpack('B')
+                readoff = _unpack_24bit(unp)
+                writeoff = _unpack_24bit(unp)
+                size = _unpack_24bit(unp)
+                if size == 0:
+                    size = 0x1000000
+                yield (com, type, readoff, writeoff, size)
+            case _:
+                raise UnknownCommand(com)
 
-def _event_67_bytes(type, data):
-    yield from [0x67, 0x66]
-    yield type
-    yield from len(data).to_bytes(4, 'little')
+def _event_bytes(event):
+    ev0 = event[0].to_bytes(1, 'little')
+    match _COM_KINDS.get(event[0]):
+        case NoParams():
+            return ev0
+        case Unpack(format):
+            return ev0 + unpacker.pack(format, *event[1:])
+        case SpecialCase(x) if x in irange(0x41, 0x4E):
+            if len(event) == 3:
+                return ev0 + unpacker.pack('BB', *event[1:])
+            else:
+                return ev0 + unpacker.pack('B', *event[1:])
+        case SpecialCase(0x67):
+            return ev0 + b'\x66' + unpacker.pack('BL', event[1], event[2])
+        case SpecialCase(0x68):
+            return b''.join([
+                ev0, 
+                b'\x66',
+                unpacker.pack('B', event[1]),
+                event[2].to_bytes(3, 'little'),
+                event[3].to_bytes(3, 'little'),
+                (event[4] & 0xFFFFFF).to_bytes(3, 'little'),
+            ])
+        case _:
+            raise UnknownCommand(com)
 
 def events_csv(events):
     t = 0
     yield 'Sample,Description,Raw data'
     for event in events:
-        if event[0] == 0x67:
-            (_, type, data) = event
-            descr = f'DATA type={type} len={len(data)}'
-            rawdata = ' '.join(f'{x:02X}' for x in _event_67_bytes(type, data)) + ' ...'
-            yield f'{t},{descr},{rawdata}'
-            continue
-        rawdata = ' '.join(f'{x:02X}' for x in event)
+        rawdata = ' '.join(f'{x:02X}' for x in _event_bytes(event))
         wait = 0
-        match event[0]:
-            case 0x52 | 0x53:
+        match event:
+            case (0x67, type, data):
+                descr = f'DATA type={type} len={len(data)}'
+                rawdata += ' ...'
+            case (0x52, addr, data) | (0x53, addr, data):
                 port = event[0] & 1
-                addr = event[1]
-                d = bitfield.make(event[2])
+                d = bitfield.make(data)
                 match (port, addr):
                     case (0, 0x22):
                         res = 'En' if d[3] else 'Dis'
@@ -199,8 +253,8 @@ def events_csv(events):
                         descr = _fm_ch(p, a) + f'AMS={d[2:0]} PMS={d[5:4]} Pan={d[7:6]}'
                     case _:
                         descr = 'YM2612 unrecognized command'
-            case 0x50:
-                d = bitfield.make(event[1])
+            case (0x50, data):
+                d = bitfield.make(data)
                 if d[7]:
                     if d[4]:
                         ch = f'PSG{1+d[6:5]} ' if d[6:5] != 3 else 'PSG Noise '
@@ -212,43 +266,36 @@ def events_csv(events):
                         descr = f'SN76489 PSG Noise Mode={d[3:0]}'
                 else:
                     descr = f'SN76489 PSG^ FreqH={d[5:0]}'
-            case 0x61:
-                wait = event[1] + (event[2] << 8)
+            case (0x61, pause):
+                wait = pause
                 descr = f'Wait {wait} samples'
-            case 0x62:
+            case (0x62,):
                 wait = 735
                 descr = f'Wait {wait} samples'
-                t += wait
-            case 0x63:
+            case (0x63,):
                 wait = 882
                 descr = f'Wait {wait} samples'
-                t += wait
-            case _ if (event[0] & 0xF0) == 0x70:
-                wait = 1 + (event[0] & 0x0F)
+            case (x,) if x in irange(0x70, 0x7F):
+                wait = x - 0x70 + 1
                 descr = f'Wait {wait} samples'
-            case _ if (event[0] & 0xF0) == 0x80:
-                wait = event[0] & 0x0F
+            case (x,) if x in irange(0x80, 0x8F):
+                wait = x - 0x80
                 if wait == 0:
                     descr = 'YM2612 DAC play sample'
                 else:
                     descr = f'YM2612 DAC play sample and wait {wait} samples'
-            case 0x68:
-                chip = event[2]
-                readoff = event[3] + (event[4] << 8) + (event[5] << 16)
-                writeoff = event[6] + (event[7] << 8) + (event[8] << 16)
-                size = event[9] + (event[10] << 8) + (event[11] << 16)
+            case (0x68, chip, readoff, writeoff, size):
                 descr = f'DAC PCM RAM operation: chip={chip} size={size} read={readoff} write={writeoff}'
-            case 0x90:
-                descr = f'Generic DAC setup: ID={event[1]} chip={event[2]} port={event[3]} com={event[4]}'
-            case 0x91:
-                descr = f'Generic DAC set stream data: ID={event[1]} bank={event[2]} step={event[3]} start={event[4]}'
-            case 0x92:
-                freq = event[2] + (event[3] << 8) + (event[4] << 16) + (event[5] << 24)
-                descr = f'Generic DAC set stream freq: ID={event[1]} freq={freq}'
-            case 0x93:
+            case (0x90, id, chip, port, com):
+                descr = f'Generic DAC setup: ID={id} chip={chip} port={port} com={com}'
+            case (0x91, id, bank, step, start):
+                descr = f'Generic DAC set stream data: ID={id} bank={bank} step={step} start={start}'
+            case (0x92, id, freq):
+                descr = f'Generic DAC set stream freq: ID={id} freq={freq}'
+            case (0x93, id, start, flags, length):
                 start = event[2] + (event[3] << 8) + (event[4] << 16) + (event[5] << 24)
                 length = event[7] + (event[8] << 8) + (event[9] << 16) + (event[10] << 24)
-                match event[6]:
+                match flags:
                     case 0x00 | 0x10 | 0x80 | 0x90: lensuffix = '(ignore)'
                     case 0x01: lensuffix = 'cmd'
                     case 0x02: lensuffix = 'ms'
@@ -263,26 +310,20 @@ def events_csv(events):
                     case 0x92: lensuffix = 'ms(loop+reversed)'
                     case 0x93: lensuffix = '(untilend+loop+reversed)'
                     case _: lensuffix = '??'
-                descr = f'Generic DAC start stream: ID={event[1]} start={start} len={length}{lensuffix}'
-            case 0x94:
-                descr = f'Generic DAC stop stream: ID={event[1]}'
-            case 0x95:
+                descr = f'Generic DAC start stream: ID={id} start={start} len={length}{lensuffix}'
+            case (0x94, id):
+                descr = f'Generic DAC stop stream: ID={id}'
+            case (0x95, id, block, flags):
                 block = event[2] + (event[3] << 8)
-                match event[4]:
+                match flags:
                     case 0x00: flags = 'none'
                     case 0x01: flags = 'loop'
                     case 0x10: flags = 'reverse'
                     case 0x11: flags = 'loop+reverse'
                     case _: flags = '??'
-                descr = f'Generic DAC start stream: ID={event[1]} block={block} flags={flags}'
-            case 0xE0:
-                read = event[1] + (event[2] << 8) + (event[3] << 16) + (event[4] << 24)
-                descr = f'YM2612 DAC read={read}'
-            case 0x67:
-                type = event[2]
-                length = event[3] + (event[4] << 8) + (event[5] << 16) + (event[6] << 24)
-                descr = f'DATA type={type} len={length}'
-                del type
+                descr = f'Generic DAC start stream: ID={id} block={block} flags={flags}'
+            case (0xE0, offset):
+                descr = f'YM2612 DAC read={offset}'
             case _:
                 descr = ''
         yield f'{t},{descr},{rawdata}'

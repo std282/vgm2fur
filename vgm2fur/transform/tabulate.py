@@ -166,22 +166,20 @@ def _events_to_actions(events):
                 yield FmWrite(1, addr, data)
             case (0x50, data):
                 yield PsgWrite(data)
-            case (0x61, wait_l, wait_h):
-                wait = wait_l + wait_h * 256
+            case (0x61, wait):
                 yield Wait(wait)
-            case (0x62, ):
+            case (0x62,):
                 yield Wait(735)
-            case (0x63, ):
+            case (0x63,):
                 yield Wait(882)
-            case _ if 0x70 <= event[0] and event[0] <= 0x7F:
+            case (x,) if 0x70 <= x and x <= 0x7F:
                 yield Wait(event[0] - 0x70 + 1)
-            case 0x80:
+            case (0x80,):
                 yield PlaySample()
-            case _ if 0x81 <= event[0] and event[0] <= 0x8F:
+            case (x,) if 0x81 <= x and x <= 0x8F:
                 yield PlaySample()
                 yield Wait(event[0] - 0x80)
-            case (0xE0, a0, a1, a2, a3):
-                addr = a0 + (a1 << 8) + (a2 << 16) + (a3 << 24)
+            case (0xE0, addr):
                 yield SetSamplePointer(addr)
             case (0x67, type, data):
                 yield DataBlock(type, data)

@@ -9,14 +9,18 @@ class Unpacker:
         if left < 0:
             left = 0
         return left
-    def unpack(self, format):
-        format = '<' + format
+    def unpack_tuple(self, format):
+        if format[0] not in '<>=@!':
+            format = '<' + format
         size = struct.calcsize(format)
         try:
             result = struct.unpack_from(format, self.data, self.offset)
         except struct.error as err:
             raise NoDataError(size, self.left(), self.offset) from err
         self.offset += size
+        return result
+    def unpack(self, format):
+        result = self.unpack_tuple(format)
         return result if len(result) != 1 else result[0]
     def expect(self, format, expected):
         actual = self.unpack(format)
@@ -58,3 +62,8 @@ class UnexpectedError(Exception):
         self.actual = actual
     def __str__(self):
         return f'expected {self.expected}, got {self.actual}'
+
+def pack(format, *args, **kwargs):
+    if format[0] not in '<>=@!':
+        format = '<' + format
+    return struct.pack(format, *args, **kwargs)
