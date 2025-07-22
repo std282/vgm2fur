@@ -72,7 +72,6 @@ def prepare(dac):
 def to_patterns(dac, /, *, mapping, rowdur):
     keyid_c = -1
     left = -1
-    vol = 0x70
     for keyid, begin, length in dac:
         if length == 0:
             if left > 0:
@@ -83,7 +82,7 @@ def to_patterns(dac, /, *, mapping, rowdur):
         elif keyid != keyid_c:
             note, ins = mapping[begin, length]
             left = (length + rowdur - 1) // rowdur
-            yield furnace.Entry(note=note, ins=ins, vol=vol)
+            yield furnace.Entry(note=note, ins=ins)
             keyid_c = keyid
         else:
             if left > 0:
@@ -146,9 +145,15 @@ def _resolve(datablocks):
 def _typed_data_block(type, payload):
     match type:
         case 0x00:
-            return YM2612DAC(payload)
+            return YM2612DAC(_to_signed(payload))
         case _:
             return UnknownBlock(type, payload)
+
+def _to_signed(upcm):
+    spcm = bytearray()
+    for x in upcm:
+        spcm.append((x - 0x80) & 0xFF)
+    return bytes(spcm)
 
 def _decode_bitpack_low(enc, bc, bd, offset):
     dec = []

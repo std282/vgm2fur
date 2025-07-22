@@ -26,21 +26,24 @@ class Song:
 
     def events(self, *chiplist):
         unp = unpacker.Unpacker(self.data)
-        comset = {0x61, 0x62, 0x63, *range(0x70, 0x90)}
-        for chip in chiplist:
-            match chip:
-                case 'ym2612':
-                    comset |= {0x52, 0x53}
-                case 'sn76489':
-                    comset |= {0x50}
-                case 'data':
-                    comset |= {0x67}
-                case 'dac':
-                    comset |= {*range(0x90, 0x96), 0xE0}
         _seek_vgm_data_start(unp)
-        for com in _events(unp, self.version):
-            if com[0] in comset:
-                yield com
+        if len(chiplist) > 0:
+            comset = {0x61, 0x62, 0x63, *range(0x70, 0x90)}
+            for chip in chiplist:
+                match chip:
+                    case 'ym2612':
+                        comset |= {0x52, 0x53}
+                    case 'sn76489':
+                        comset |= {0x50}
+                    case 'data':
+                        comset |= {0x67}
+                    case 'dac':
+                        comset |= {*range(0x90, 0x96), 0xE0}
+            for com in _events(unp, self.version):
+                if com[0] in comset:
+                    yield com
+        else:
+            yield from _events(unp, self.version)
 
     @property
     def version(self):
