@@ -9,6 +9,7 @@ class Sampler:
         self._length = [0]
         self._duration = [0]
         self.pause = 0
+        self.idle = True
 
     @property
     def length(self):
@@ -30,12 +31,13 @@ class Sampler:
         return self.keyid == other.keyid
 
     def set(self, ptr):
-        if self.duration > 0:
+        if self.duration > 0 or self.idle:
             self.keyid += 1
             self.start = ptr
             self._length = [0]
             self._duration = [0]
             self.pause = 0
+            self.idle = False
         else:
             self.start = ptr
             self.length = 0
@@ -71,6 +73,7 @@ class Sampler:
         clone._length = self._length
         clone._duration = self._duration
         clone.pause = self.pause
+        clone.idle = self.idle
         return clone
 
 def csv(chip_states, features):
