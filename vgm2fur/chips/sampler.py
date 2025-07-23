@@ -1,7 +1,7 @@
 from vgm2fur import vgm
 
 class Sampler:
-    separation_margin = 44
+    separation_margin = 512
     def __init__(self, /, *, noinit=False):
         if noinit: return
         self.keyid = 0
@@ -30,11 +30,16 @@ class Sampler:
         return self.keyid == other.keyid
 
     def set(self, ptr):
-        self.keyid += 1
-        self.start = ptr
-        self._length = [0]
-        self._duration = [0]
-        self.pause = 0
+        if self.duration > 0:
+            self.keyid += 1
+            self.start = ptr
+            self._length = [0]
+            self._duration = [0]
+            self.pause = 0
+        else:
+            self.start = ptr
+            self.length = 0
+            self.pause = 0
 
     def play(self):
         if self.length > 0:
