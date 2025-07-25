@@ -59,5 +59,5 @@ You can append to the command one or more following options. `iii` means integer
 ## Limitations
 
 At the moment only SEGA Genesis (YM2612 + SN76489) VGM modules are supported, with following limitations:
-- DAC/PCM is not supported, program will ignore it
+- DAC/PCM is partially supported
 - CSM is not supported, program will exit with an error
