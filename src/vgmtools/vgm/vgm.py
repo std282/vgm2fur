@@ -18,6 +18,9 @@ import warnings
 import gzip
 import bitfield
 
+Command = tuple[int, ...]
+DataBlock = tuple[int, bytes]
+
 class VGM:
     """Provides interface to VGM file content.
 
@@ -42,7 +45,8 @@ class VGM:
             PreambleMismatch - when data has no VGM preamble
         """
         self.data = data
-        self._datablocks = None
+        self.__commands = None
+        self.__datablocks = None
         if self.__preamble != b'Vgm ':
             raise PreambleMismatch()
 
@@ -66,30 +70,30 @@ class VGM:
             return 0x34 + reloff
 
     @property
-    def commands(self) -> list[tuple[int, ...]]:
+    def commands(self) -> list[Command]:
         """Returns list of VGM commands.
 
         Each command is a tuple. First element of a command is a command number,
         which determines the length of a tuple and its content.
         """
-        if self._commands is not None:
-            return self._commands
-        self._commands = []
-        self._datablocks = []
+        if self.__commands is not None:
+            return self.__commands
+        self.__commands = []
+        self.__datablocks = []
         walker = ByteWalker(self.data, self.__data_offset)
         datablock_dicts = {}
         while not (done := False):
             cmd = walker.byte()
             match COMMAND_ARGS_SPEC.get(cmd):
                 case Fixed(''):
-                    self._commands.append((cmd,))
+                    self.__commands.append((cmd,))
                 case Fixed(fmt):
-                    self._commands.append((cmd,) + walker.unpack(fmt))
+                    self.__commands.append((cmd,) + walker.unpack(fmt))
                 case Special(x) if 0x41 <= x and x <= 0x4E:
                     if self.version >= 0x160:
-                        self._commands.append((cmd,) + walker.unpack('<BB'))
+                        self.__commands.append((cmd,) + walker.unpack('<BB'))
                     else:
-                        self._commands.append((cmd, walker.byte()))
+                        self.__commands.append((cmd, walker.byte()))
                 case Special(0x66):
                     done = True
                 case Special(0x67):
@@ -100,7 +104,7 @@ class VGM:
                     datablock = handle_data_block(type, data, datablock_dicts)
                     if datablock is not None:
                         type, data = datablock
-                        self._datablocks.append(type, data)
+                        self.__datablocks.append(type, data)
                 case Special(0x68):
                     if (x := walker.byte()) != 0x66:
                         warnings.warn(f'expected byte 0x66 after 0x68, got 0x{x:02X}')
@@ -110,20 +114,20 @@ class VGM:
                     size = int.from_bytes(walker.bytes(3), 'little')
                     if size == 0:
                         size = 0x0100_0000
-                    self._commands.append((cmd, type, readoff, writeoff, size))
+                    self.__commands.append((cmd, type, readoff, writeoff, size))
                 case _:
                     warnings.warn(f'unknown VGM command: 0x{cmd:02X}')
 
     @property
-    def datablocks(self) -> list[tuple[int, bytes]]:
+    def datablocks(self) -> list[DataBlock]:
         """List of data blocks.
 
         Each data block is a tuple. First element of a tuple is a data block
         type, second element is data itself.
         """
-        if self._datablocks is None:
+        if self.__datablocks is None:
             _ = self.commands
-        return self._datablocks
+        return self.__datablocks
 
     @property
     def csv(self) -> Iterable[str]:
@@ -387,6 +391,7 @@ def load(filename: str, /) -> VGM:
     Exceptions:
         BadVgmFile - when file is not a valid VGM file
     """
+    data: bytes
     try:
         with gzip.open(filename, 'rb') as f:
             data = f.read()
@@ -592,20 +597,20 @@ def decode_bitpack_low(bc: int, bd: int, offset: int, data: bytes) -> bytes:
 def decode_bitpack_high(bc: int, bd: int, offset: int, data: bytes) -> bytes:
     dec = []
     shift = bd - bc
-    for x in bitstream(enc, bc):
+    for x in bitstream(data, bc):
         dec.append((x << shift) + offset)
     return b''.join(x.to_bytes((bd + 7) // 8, 'little') for x in dec)
 
 def decode_bitpack_map(bc: int, bd: int, dict: list[int], data: bytes) -> bytes:
     dec = []
-    for x in bitstream(enc, bc):
+    for x in bitstream(data, bc):
         dec.append(dict[x])
     return b''.join(x.to_bytes((bd + 7) // 8, 'little') for x in dec)
 
 def decode_dpcm(bc: int, bd: int, start: int, dict: list[int], data: bytes) -> bytes:
     dec = []
     x = start
-    for dx in bitstream(enc, bc):
+    for dx in bitstream(data, bc):
         x += dict[dx]
         dec.append(x)
     return b''.join(x.to_bytes((bd + 7) // 8, 'little') for x in dec)
