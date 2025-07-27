@@ -11,6 +11,14 @@ Exceptions:
     UnexpectedEOF - thrown when EOF condition is reached during parsing
 """
 
-from .vgm import load, BadVgmFile, UnexpectedEOF
+from .vgm import (
+    # functions
+    load, 
+    # classes
+    BadVgmFile, 
+    UnexpectedEOF,
+    # typing
+    Command,
+)
 
 SAMPLE_RATE = 44100
