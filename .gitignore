@@ -1,5 +1,9 @@
+songs/
+vgm2fur/
+
+###############################################################################
+
 **/.DS_Store
-._songs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

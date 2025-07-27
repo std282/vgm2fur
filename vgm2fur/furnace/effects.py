@@ -1,8 +1,0 @@
-def porta_up(magnitude): return (0x01, magnitude)
-def porta_down(magnitude): return (0x02, magnitude)
-def pitch_up(freq_units): return (0xF1, freq_units)
-def pitch_down(freq_units): return (0xF2, freq_units)
-def pan(value): return (0x08, value)
-def legato(value): return (0xEA, value)
-def noise_mode(value): return (0x20, value)
-def lfo(value): return (0x10, value)
