@@ -1,6 +1,6 @@
 import enum
 import warnings
-from vgmtools.vgm import Command as VGMCommand
+from . import VGMCommand
 import bitfield
 
 class Chip:
