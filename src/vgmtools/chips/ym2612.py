@@ -12,7 +12,6 @@ class Chip:
         ch3mode - channel 3 mode
         fm - FM channels state
         ch3op - channel 3 special mode operator 1-3 frequencies
-        sampler - sampler to track down DAC usage
 
     Methods:
         play - update chip state according to VGM command
@@ -32,58 +31,55 @@ class Chip:
         self.ch3mode = Ch3Mode.NORMAL
         self.fm = [FM(), FM(), FM(), FM(), FM(), FM()]
         self.ch3op = [Ch3Op(), Ch3Op(), Ch3Op()]
-        self.sampler = Sampler()
+
+    supported_commands = frozenset([0x52, 0x53, *range(0x80, 0x90), 0xE0])
+    """List of VGM command numbers that can be handled by YM2612."""
+    
+    id = 'ym2612'
 
     def play(self, cmd: VGMCommand, /):
         """Updates chip state according to VGM command.
 
         Positional arguments:
-            cmd - VGM command, tuple of kind (0x50, x)
+            cmd - VGM command, tuple of kind (0x52, x, y) or (0x53, x, y)
         """
-        match cmd:
-            case (port, addr, data) if (port & 0xFE) == 0x52:
-                data = bitfield.make(data)
-                match (port, addr):
-                    case (0x52, 0x22):
-                        self.lfo = data[2:0] if data[3] else None
-                    case (0x52, 0x24):
-                        pass  # timer A
-                    case (0x52, 0x25):
-                        pass  # timer A
-                    case (0x52, 0x26):
-                        pass  # timer B
-                    case (0x52, 0x27):
-                        self.ch3mode = Ch3Mode(data[7:6])
-                    case (0x52, 0x28):
-                        if data[1:0] < 3:
-                            fm = self.fm[data[2] * 3 + data[1:0]]
-                            opmask = data[7:4]
-                            if fm.opmask != opmask:
-                                fm.opmask = opmask
-                                fm.trig += 1
-                        else:
-                            warnings.warn(InvalidCommand(cmd))
-                    case (0x52, 0x2A): 
-                        # should not appear in any VGM ever
-                        # but what if it will??
-                        self.sampler.advance()
-                    case (0x52, 0x2B):
-                        self.dac = (data[7] != 0)
-                    case (0x52, _) if (addr & 0xF8) == 0xA8 and (addr & 3) != 3:
-                        i = [2, 0, 1][addr & 3]
-                        self.fm3op[i].play(addr & 0xFC, data)
-                    case _ if (addr & 3) != 3:
-                        i = 3 * (port - 0x52) + (addr & 3)
-                        try: 
-                            self.fm[i].play(addr & 0xFC, data)
-                        except InvalidCommandReport:
-                            warnings.warn(InvalidCommand(cmd))
-                    case _:
-                        warnings.warn(InvalidCommand(cmd))
-            case (0xE0, ptr):
-                self.sampler.ptr = ptr
-            case (x,) if (x & 0xF0) == 0x80:
-                self.sampler.advance()
+        if cmd[0] & 0xFE != 0x52:
+            return
+        (port, addr, data) = cmd
+        data = bitfield.make(data)
+        match (port, addr):
+            case (0x52, 0x22):
+                self.lfo = data[2:0] if data[3] else None
+            case (0x52, 0x24):
+                pass  # timer A
+            case (0x52, 0x25):
+                pass  # timer A
+            case (0x52, 0x26):
+                pass  # timer B
+            case (0x52, 0x27):
+                self.ch3mode = Ch3Mode(data[7:6])
+            case (0x52, 0x28):
+                if data[1:0] < 3:
+                    fm = self.fm[data[2] * 3 + data[1:0]]
+                    opmask = data[7:4]
+                    if fm.opmask != opmask:
+                        fm.opmask = opmask
+                        fm.trig += 1
+                else:
+                    warnings.warn(InvalidCommand(cmd))
+            case (0x52, 0x2B):
+                self.dac = (data[7] != 0)
+            case (0x52, _) if (addr & 0xF8) == 0xA8 and (addr & 3) != 3:
+                i = [2, 0, 1][addr & 3]
+                self.fm3op[i].play(addr & 0xFC, data)
+            case _ if (addr & 3) != 3:
+                i = 3 * (port - 0x52) + (addr & 3)
+                try: 
+                    self.fm[i].play(addr & 0xFC, data)
+                except InvalidCommandReport:
+                    warnings.warn(InvalidCommand(cmd))
+            case _:
+                warnings.warn(InvalidCommand(cmd))
 
 
 class FM:
@@ -219,21 +215,6 @@ class Panning(enum.IntEnum):
     LEFT = 1
     RIGHT = 2
     CENTER = 3
-
-class Sampler:
-    """Sample playback state class.
-
-    Variables:
-        trig - sample playback count
-        ptr - location of next sample to be played
-    """
-    def __init__(self, /):
-        self.trig = 0
-        self.ptr = 0
-    def advance(self, /):
-        """Plays a single sample."""
-        self.trig += 1
-        self.ptr += 1
 
 class InvalidCommand(UserWarning):
     """Warning class for invalid YM2612 commands."""

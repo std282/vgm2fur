@@ -23,13 +23,16 @@ class Chip:
         self.noise = NoiseChannel()
         self._prevtonal = None
 
+    supported_commands = frozenset([0x50])
+    """List of VGM command numbers that can be handled by SN76489."""
+    id = 'sn76489'
+
     def play(self, cmd: VGMCommand, /):
         """Updates chip state according to VGM command.
 
         Positional arguments:
             cmd - VGM command, tuple of kind (0x50, x)
         """
-        assert cmd[0] == 0x50
         (_, data) = cmd
         match decode(bitfield.make(data)):
             case TonalVolume(i, vol):
