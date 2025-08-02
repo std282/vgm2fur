@@ -1,3 +1,16 @@
+"""Provides interfaces for accessing individual bits and bit ranges of an 
+integer numbers.
+
+Classes:
+    Bitfield - base class for bitfields
+    named - helper class for making named fields
+
+Functions:
+    make - helper function to type less
+"""
+
+__all__ = ('Bitfield', 'named', 'make')
+
 class Bitfield:
     """Provides interface to access individual bits and bit ranges of a number."""
     def __init__(self, value: int):
