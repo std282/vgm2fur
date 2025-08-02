@@ -9,7 +9,6 @@ class Chip:
         self.ptr = 0
         self.trig = 0
 
-    id = 'ym2612/dac'
     supported_commands = frozenset([0xE0, *range(0x80, 0x90)])
     def play(self, cmd: VGMCommand, /):
         """Updates chip state according to VGM command.

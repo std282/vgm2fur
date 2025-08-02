@@ -9,7 +9,7 @@ class Chip:
     Variables:
         lfo - LFO mode (None if disabled, int-magnitude if enabled)
         dac - is DAC enabled
-        ch3mode - channel 3 mode
+        mode - channel 3 mode
         fm - FM channels state
         ch3op - channel 3 special mode operator 1-3 frequencies
 
@@ -28,14 +28,12 @@ class Chip:
         """
         self.lfo = None
         self.dac = False
-        self.ch3mode = Ch3Mode.NORMAL
+        self.mode = Ch3Mode.NORMAL
         self.fm = [FM(), FM(), FM(), FM(), FM(), FM()]
         self.ch3op = [Ch3Op(), Ch3Op(), Ch3Op()]
 
     supported_commands = frozenset([0x52, 0x53, *range(0x80, 0x90), 0xE0])
     """List of VGM command numbers that can be handled by YM2612."""
-    
-    id = 'ym2612'
 
     def play(self, cmd: VGMCommand, /):
         """Updates chip state according to VGM command.
@@ -57,7 +55,7 @@ class Chip:
             case (0x52, 0x26):
                 pass  # timer B
             case (0x52, 0x27):
-                self.ch3mode = Ch3Mode(data[7:6])
+                self.mode = Ch3Mode(data[7:6])
             case (0x52, 0x28):
                 if data[1:0] < 3:
                     fm = self.fm[data[2] * 3 + data[1:0]]

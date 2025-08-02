@@ -25,7 +25,6 @@ class Chip:
 
     supported_commands = frozenset([0x50])
     """List of VGM command numbers that can be handled by SN76489."""
-    id = 'sn76489'
 
     def play(self, cmd: VGMCommand, /):
         """Updates chip state according to VGM command.
