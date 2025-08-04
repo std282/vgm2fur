@@ -1,5 +1,13 @@
-from . import VGMCommand
+from dataclasses import dataclass, field
+from typing import TypeVar
+
 import bitfield
+import bestfit
+
+from . import VGMCommand
+
+T = TypeVar('T')
+Tuple3 = tuple[T, T, T]
 
 class Chip:
     """SN76489 chip behaviour model class.
@@ -11,6 +19,7 @@ class Chip:
     Methods:
         play - update chip state according to VGM command
     """
+    __slots__ = ('tonal', 'noise', '_prevtonal')
     def __init__(self, /):
         """Initializes chip to default state.
         
@@ -19,8 +28,8 @@ class Chip:
             - tonal channels frequency = 0
             - noise mode = 0
         """
-        self.tonal = (TonalChannel(), TonalChannel(), TonalChannel())
-        self.noise = NoiseChannel()
+        self.tonal = (Tonal(), Tonal(), Tonal())
+        self.noise = Noise()
         self._prevtonal = None
 
     supported_commands = frozenset([0x50])
@@ -46,27 +55,35 @@ class Chip:
             case NoiseMode(vol):
                 self.noise.mode = mode
 
+    def state(self):
+        return ChipState(tonal=tuple(x.copy() for x in self.tonal), 
+            noise=noise.copy())
 
-class TonalChannel:
-    """Tonal channel (PSG1-PSG3)."""
-    def __init__(self, /):
-        """Initializes tonal channel to its default state."""
-        self.freq = FrequencyBitfield(0)
-        self.vol = 15
+@dataclass(slots=True)
+class ChipState:
+    tonal: Tuple3[Tonal] = field(default_factory=lambda: (Tonal(), Tonal(), Tonal()))
+    noise: Noise = field(default_factory=Noise)
+
 
 class FrequencyBitfield(bitfield.Bitfield):
     """Divides PSG "frequency" into two fields, according to write order."""
     low = bitfield.named[3:0]
     high = bitfield.named[9:4]
 
+    def __init__(self):
+        super().__init__(0)
 
-class NoiseChannel:
+@dataclass(slots=True)
+class Tonal:
+    """Tonal channel (PSG1-PSG3)."""
+    freq: FrequencyBitfield = field(default_factory=FrequencyBitfield)
+    vol: int = 15
+
+@dataclass(slots=True)
+class Noise:
     """Noise channel."""
-    def __init__(self, /):
-        """Initializes noise channel to default state."""
-        self.mode = 0
-        self.vol = 15
-
+    mode: int = 0
+    vol: int = 15
 
 class TonalVolume(NamedTuple): ch: int; vol: int
 class TonalFreqLow(NamedTuple): ch: int; freq: int
