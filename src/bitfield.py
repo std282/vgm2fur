@@ -30,7 +30,7 @@ class Bitfield:
         """
         lower, upper = order_bounds(*process_key(key))
         return get(value=self.all, mask=mask(lower, upper), shift=lower)
-    def __setitem__(self, key: int | slice, value: int)
+    def __setitem__(self, key: int | slice, value: int):
         """Allows for writing individual bits or ranges.
 
         bf[3] - for accessing individual bits

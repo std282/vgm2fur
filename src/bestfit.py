@@ -1,12 +1,6 @@
 import bisect
-from collections.abc import Sequence
-from typing import TypeVar, Protocol
 
-T = TypeVar('T')
-Num = int | float
-Entry = tuple[T, Num]
-
-def bestfit(ref: Num, mapping: list[tuple[T, Num]], /) -> tuple[T, Num]:
+def bestfit(ref, mapping], /):
     """Finds best fitting entry in mapping.
 
     Positional parameters:

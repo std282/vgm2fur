@@ -3,16 +3,10 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vgm2fur"
+name = "chiptune-tools"
+version = "0.5"
 authors = [
   {name = "std282"}
 ]
 requires-python = ">=3.10"
 license = "MIT"
-dynamic = ["version"]
-
-[project.scripts]
-vgm2fur = 'vgm2fur.main:main'
-
-[tool.setuptools.dynamic]
-version = {attr = "vgm2fur.__version__"}
