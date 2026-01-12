@@ -48,7 +48,7 @@ def collect_stuff(dac, datablocks, instr_start):
     instrs = []
     sample_start = 0
     for play in dac:
-        if play.length == 0:
+        if play.length == 0 or play.duration == 0:
             continue
         pos = (play.start, play.length)
         if pos not in mapping:
@@ -80,7 +80,11 @@ def to_patterns(dac, /, *, mapping, rowdur):
             else:
                 yield furnace.Entry()
         elif keyid != keyid_c:
-            note, ins = mapping[start, length]
+            try:
+                note, ins = mapping[start, length]
+            except KeyError:
+                note = furnace.notes.Off
+                ins = None
             left = (dur + rowdur - 1) // rowdur
             yield furnace.Entry(note=note, ins=ins)
             keyid_c = keyid
