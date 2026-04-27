@@ -2,6 +2,9 @@
 
 A Python CLI application that allows to convert VGM files to Furnace modules.
 
+> [!WARNING] 
+> As of April 2026, this version is abandoned. Please do not expect support. Sorry.
+
 ## Installation
 
 **Prerequisites**:
@@ -61,3 +64,11 @@ You can append to the command one or more following options. `iii` means integer
 At the moment only SEGA Genesis (YM2612 + SN76489) VGM modules are supported, with following limitations:
 - DAC/PCM is partially supported
 - CSM is not supported, program will exit with an error
+
+## Further development
+
+I'm currently privately working on a new version of vgm2fur that is expected to be more sustainable and extensible in the long run, so that it can at last support YM2612 DAC completely and bug-free; and then probably more chips. Unfortunately, by the looks of things, it's probably going to take one me or two more years to bring it to the level of capabilities that this version has.
+
+This project was developed in a rapid succession while I was on a big vacation. I don't think I can afford as much free time to properly develop this project anymore, without sacrificing the development of other interesting and inspiring projects that I also want to pursue.
+
+If someone manages to create their own version of vgm2fur that is better than mine, I'll be glad to be relieved from this responsibility - hell, I'll probably even contribute to it, because I like this project. But until then, I can promise I'll keep investing at least an hour of my time a week to vgm2fur ❤️
